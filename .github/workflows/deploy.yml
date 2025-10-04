@@ -1,13 +1,7 @@
-﻿name: CI & Release
+﻿name: poly-chat-bridge CI & CD
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to build/publish'
-        required: true
-        default: 'main'
-        type: string
 
 permissions:
   contents: read
