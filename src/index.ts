@@ -1,3 +1,7 @@
-﻿export function hello(name: string = "world"): string {
-    return `hello, ${name}`;
+﻿export function hello(): string {
+    return `hello`;
+}
+
+export function world(): string {
+    return `world`;
 }
