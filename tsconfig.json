@@ -1,0 +1,15 @@
+﻿{
+  "compilerOptions": {
+    "target": "ES2019",
+    "lib": ["ES2019","DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src"]
+}
