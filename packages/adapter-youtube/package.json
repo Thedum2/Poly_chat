@@ -1,0 +1,14 @@
+{
+  "name": "adapter-youtube",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsup src/YouTubeAdapter.ts",
+    "dev": "tsup src/YouTubeAdapter.ts --watch",
+    "clean": "rimraf dist"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0"
+  }
+}

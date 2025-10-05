@@ -1,15 +1,24 @@
-﻿{
+{
   "compilerOptions": {
-    "target": "ES2019",
-    "lib": ["ES2019","DOM"],
+    "target": "ES2020",
     "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "moduleResolution": "node",
     "strict": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@polychat/core": ["packages/polychat-core/src"],
+      "@polychat/adapter-chzzk": ["packages/adapter-chzzk/src"],
+      "@polychat/adapter-soop": ["packages/adapter-soop/src"],
+      "@polychat/adapter-youtube": ["packages/adapter-youtube/src"]
+    }
   },
-  "include": ["src"]
+  "references": [
+    { "path": "packages/polychat-core" },
+    { "path": "packages/adapter-chzzk" },
+    { "path": "packages/adapter-soop" },
+    { "path": "packages/adapter-youtube" }
+  ],
+  "exclude": ["node_modules", "dist"]
 }
