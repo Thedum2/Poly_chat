@@ -6,12 +6,6 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
-    "paths": {
-      "polychat-core/*": ["./packages/polychat-core/src/*"],
-      "adapter-chzzk/*": ["./packages/adapter-chzzk/src/*"],
-      "adapter-youtube/*": ["./packages/adapter-youtube/src/*"],
-      "adapter-soop/*": ["./packages/adapter-soop/src/*"]
-    }
+    "baseUrl": "."
   }
 }

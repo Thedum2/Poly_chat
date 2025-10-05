@@ -14,24 +14,40 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup --config tsup.config.ts",
     "dev": "tsup --watch --config tsup.config.ts",
     "clean": "rimraf dist",
-    "prepublishOnly": "npm run clean && npm run build",
-    "build:all": "tsc --build",
-    "dev:all": "tsc --build --watch"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "demo:node": "tsx apps/example-node/src/demo.ts",
+    "prepublishOnly": "npm run clean && npm run build"
   },
   "devDependencies": {
+    "@swc/core": "^1.6.13",
     "rimraf": "^6.0.0",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "tsup": "^8.0.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.5.0"
   },
-  "engines": { "node": ">=18" },
-  "repository": { "type": "git", "url": "https://github.com/Thedum2/Poly_chat" },
-  "bugs":       { "url": "https://github.com/Thedum2/Poly_chat/issues" },
-  "homepage":   "https://github.com/Thedum2/Poly_chat#readme" ,
-  "workspaces": ["packages/*", "apps/*"]
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Thedum2/Poly_chat"
+  },
+  "bugs": {
+    "url": "https://github.com/Thedum2/Poly_chat/issues"
+  },
+  "homepage": "https://github.com/Thedum2/Poly_chat#readme",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ]
 }
