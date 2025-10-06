@@ -1,29 +1,45 @@
+import { EventEmitter } from 'events';
 import { IChatAdapter } from '../ports/IChatAdapter';
+import { ChatMessage } from '../models/ChatMessage';
 
-    export class PolyChat {
-      private readonly adapters: IChatAdapter[] = [];
+export class PolyChat extends EventEmitter {
+  private readonly adapters: Map<string, IChatAdapter> = new Map();
 
-      constructor(adapters: IChatAdapter[]) {
-        this.adapters = adapters;
-      }
+  constructor() {
+    super();
+  }
 
-      async connectAll(): Promise<void> {
-        for (const adapter of this.adapters) {
-          await adapter.connect();
-        }
-      }
-
-      async disconnectAll(): Promise<void> {
-        for (const adapter of this.adapters) {
-          await adapter.disconnect();
-        }
-      }
-
-      async testAll(): Promise<string[]> {
-        const results: string[] = [];
-        for (const adapter of this.adapters) {
-          results.push(await adapter.test());
-        }
-        return results;
-      }
+  public registerAdapter(adapter: IChatAdapter): void {
+    if (this.adapters.has(adapter.platform)) {
+      console.warn(`Adapter for platform '${adapter.platform}' is already registered.`);
+      return;
     }
+    this.adapters.set(adapter.platform, adapter);
+    this.listenToAdapterEvents(adapter);
+    console.log(`Adapter for ${adapter.platform} registered.`);
+  }
+
+  private listenToAdapterEvents(adapter: IChatAdapter): void {
+    adapter.on('message', (message: ChatMessage) => {
+      this.emit('message', message);
+    });
+    adapter.on('error', (error: Error) => {
+      this.emit('error', { platform: adapter.platform, error });
+    });
+  }
+
+  public getAdapter(platform: string): IChatAdapter | undefined {
+    return this.adapters.get(platform);
+  }
+
+  async testAll() {
+      for (const adapter of this.adapters.values()) {
+          await adapter.test();
+      }
+  }
+  async disconnectAll(): Promise<void> {
+    for (const adapter of this.adapters.values()) {
+      await adapter.disconnect();
+    }
+  }
+}
