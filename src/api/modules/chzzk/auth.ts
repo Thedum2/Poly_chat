@@ -1,6 +1,8 @@
 import { httpClient } from "../../httpClient";
 import { API_ENDPOINTS } from "../../config";
 import {
+    AuthCodeRequest,
+    AuthCodeResponse,
     TokenIssueRequest,
     TokenIssueResponse,
     TokenRefreshRequest,
@@ -17,13 +19,9 @@ export const chzzkAuthApi = {
     //======================
     // 1. 인증 코드 요청 및 발급
     //======================
-    getAuthCodeUrl: (clientId: string, redirectUri: string, state: string): string => {
-        const params = new URLSearchParams({
-            clientId,
-            redirectUri,
-            state,
-        });
-        return `https://chzzk.naver.com/account-interlock?${params.toString()}`;
+    getAuthCodeUrl: (data : AuthCodeRequest): string => {
+        const params = new URLSearchParams(data as any).toString();
+        return `https://chzzk.naver.com/account-interlock?${params}`;
     },
 
     //======================

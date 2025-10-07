@@ -6,8 +6,9 @@ export interface IChatAdapter {
   readonly isAuthenticated: boolean;
   readonly isConnected: boolean;
 
+  init(): Promise<void>;
   authenticate(options: AuthOptions): Promise<void>;
-  connect(channelId: string): Promise<void>;
+  connect(): Promise<void>;
   disconnect(): Promise<void>;
 
   on(event: 'message', listener: (message: ChatMessage) => void): this;

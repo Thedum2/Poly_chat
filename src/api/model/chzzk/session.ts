@@ -28,5 +28,5 @@ export interface SubscribedEvent {
 export type EventType = 'CHAT' | 'DONATION' | 'SUBSCRIPTION';
 
 export interface EventsSubscribeRequest {
-    sessionKey : string
+    sessionKey : string;
 }

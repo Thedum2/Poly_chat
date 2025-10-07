@@ -1,8 +1,6 @@
 import type {AxiosInstance, InternalAxiosRequestConfig, AxiosResponse} from "axios";
-import {SHOULD_LOG} from "../config";
 
 export function installLoggingInterceptor(instance: AxiosInstance) {
-    if (!SHOULD_LOG) return;
     instance.interceptors.request.use((c: InternalAxiosRequestConfig) => {
         console.debug(`[HTTP] → ${c.method?.toUpperCase()} ${c.baseURL}${c.url}`, {
             headers: c.headers,

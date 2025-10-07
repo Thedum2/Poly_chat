@@ -1,14 +1,14 @@
-﻿
-export type UserRoleCode =
-    | 'streamer'                    // 스트리머
-    | 'common_user'                 // 일반 유저
-    | 'streaming_channel_manager'   // 채널 관리자
-    | 'streaming_chat_manager';     // 채팅 운영자
-
-
-{/* ================================ */}
+﻿{/* ================================ */}
 {/* =========SYSTEM MESSAGE========= */}
 {/* ================================ */}
+
+export const SYSTEM_MESSAGE_TYPE = {
+    CONNECTED: 'connected',
+    SUBSCRIBED: 'subscribed',
+    UNSUBSCRIBED: 'unsubscribed',
+    REVOKED: 'revoked',
+    UNKNOWN: 'unknown',
+} as const;
 
 export interface ConnectedMessageBody {
     type: 'connected';

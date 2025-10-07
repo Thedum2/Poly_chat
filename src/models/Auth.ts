@@ -3,15 +3,19 @@ export interface AuthOptions {
 }
 
 export interface YouTubeAuthOptions extends AuthOptions {
-  apiKey: string;
+    //TODO: 추가 예정
+
 }
 
 export interface ChzzkAuthOptions extends AuthOptions {
-  nidAuth: string;
-  nidSes: string;
+    clientId: string;
+    clientSecret: string;
+    redirectUri: string;
+    state: string;
+    code: string;
 }
 
 export interface SoopAuthOptions extends AuthOptions {
-  apiKey: string;
-  userId: string;
+    //TODO: 추가 예정
+
 }

@@ -1,13 +1,13 @@
 ﻿import {ResponseBase} from "./common";
 
 {/* 인증 코드 요청 및 발급 */}
-export interface AuthCodeRequestParams {
+export interface AuthCodeRequest {
     clientId: string;
     redirectUri: string;
     state: string;
 }
 
-export interface AuthCodeResponse extends ResponseBase{
+export interface AuthCodeResponse{
     code: string;
     state: string;
 }
