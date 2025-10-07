@@ -21,11 +21,13 @@ export interface TokenIssueRequest {
     state: string;
 }
 export interface TokenIssueResponse extends ResponseBase{
-    accessToken: string;
-    refreshToken: string;
-    tokenType: 'Bearer';
-    expiresIn: string;
-    scope: string;
+    content: {
+        accessToken: string;
+        refreshToken: string;
+        tokenType: 'Bearer';
+        expiresIn: string;
+        scope: string;
+    };
 }
 
 {/* Access Token 갱신 */}
@@ -36,11 +38,13 @@ export interface TokenRefreshRequest {
     clientSecret: string;
 }
 export interface TokenRefreshResponse extends ResponseBase{
-    accessToken: string;
-    refreshToken: string;
-    tokenType: 'Bearer';
-    expiresIn: string;
-    scope: string;
+    content: {
+        accessToken: string;
+        refreshToken: string;
+        tokenType: 'Bearer';
+        expiresIn: string;
+        scope: string;
+    };
 }
 
 {/* 치지직 Access Token 삭제 */}
@@ -51,9 +55,11 @@ export interface TokenRevokeRequest {
     tokenTypeHint?: 'access_token' | 'refresh_token';
 }
 export interface TokenRevokeResponse extends ResponseBase{
-    accessToken: string;
-    refreshToken: string;
-    tokenType: 'Bearer';
-    expiresIn: string;
-    scope: string;
+    content: {
+        accessToken: string;
+        refreshToken: string;
+        tokenType: 'Bearer';
+        expiresIn: string;
+        scope: string;
+    };
 }

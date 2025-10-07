@@ -1,8 +1,10 @@
 ﻿import {ResponseBase} from "./common";
 
 {/* 세션 생성 */}
-export interface SessionCreateClientResponse extends ResponseBase{
-    url: string;
+export interface SessionCreateClientResponse extends ResponseBase {
+    content: {
+        url: string;
+    };
 }
 
 {/* 세션 목록 조회 */}
@@ -12,7 +14,7 @@ export interface SessionListClientRequest {
 }
 
 export interface SessionListClientResponse extends ResponseBase{
-    data: Session[];
+    content: {data: Session[]}
 }
 
 export interface Session {

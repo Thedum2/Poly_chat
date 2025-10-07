@@ -15,6 +15,7 @@ export function socket({
                            debug,
                            timeout
                        }: SocketClientOptions) {
+    console.log(`[socket] Connecting to url: "${url}" with options:`, { transports, forceNew, timeout });
     const s = io(url, { transports, forceNew, timeout});
 
     if (debug) {

@@ -16,12 +16,16 @@ export const chzzkSessionApi = {
             throw new Error('Client ID and Client Secret are not set.');
         }
 
-        return httpClient.get(`${chzzkApiUrl}/open/v1/sessions/auth/client`, (data) => data as SessionCreateClientResponse, {
+        const response = await httpClient.get(`${chzzkApiUrl}/open/v1/sessions/auth/client`, (data) => data as SessionCreateClientResponse, {
             headers: {
                 'Client-Id': clientId,
                 'Client-Secret': clientSecret,
             }
         });
+
+        console.log('Chzzk session API response:', response);
+
+        return response;
     },
 
     //======================
@@ -29,7 +33,7 @@ export const chzzkSessionApi = {
     //======================
     subscribeToChat: async (data: EventsSubscribeRequest): Promise<void> => {
         const formData = new FormData();
-        new FormData().append('sessionKey', data.sessionKey);
+        formData.append('sessionKey', data.sessionKey);
         await httpClient.post(`${chzzkApiUrl}/open/v1/sessions/events/subscribe/chat`, formData, (data) => data, { headers: { 'Authorization': `Bearer ${chzzkAuthStore.getState().accessToken}` } });
     },
 

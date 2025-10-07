@@ -8,7 +8,6 @@ import {
     SYSTEM_MESSAGE_TYPE,
     UnsubscribedMessageBody
 } from "../../api/model/chzzk/chzzkMessage";
-import {ChatMessage} from "../../models/ChatMessage";
 
 export const chzzkMessageHandler = {
     handleSystemMessage: (data: string): any => {

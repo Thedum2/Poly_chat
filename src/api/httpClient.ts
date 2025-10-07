@@ -9,7 +9,7 @@ export const httpClient = {
             const res = await axiosInstance.get(url, config);
             return mapper(res.data);
         } catch (e) {
-            return 'Error' as any
+            throw e;
         }
     },
     async getList<T>(url: string, mapper: Mapper<T>, config?: AxiosRequestConfig): Promise<T[]> {
@@ -18,7 +18,7 @@ export const httpClient = {
             const arr = Array.isArray(res.data) ? res.data : res.data?.items ?? [];
             return arr.map(mapper);
         } catch (e) {
-            return 'Error' as any
+            throw e;
         }
     },
     async post<T>(url: string, body: any, mapper: Mapper<T>, config?: AxiosRequestConfig): Promise<T> {
@@ -26,7 +26,7 @@ export const httpClient = {
             const res = await axiosInstance.post(url, body, config);
             return mapper(res.data);
         } catch (e) {
-            return 'Error' as any
+            throw e;
         }
     },
     async put<T>(url: string, body: any, mapper: Mapper<T>, config?: AxiosRequestConfig): Promise<T> {
@@ -34,7 +34,7 @@ export const httpClient = {
             const res = await axiosInstance.put(url, body, config);
             return mapper(res.data);
         } catch (e) {
-            return 'Error' as any
+            throw e;
         }
     },
     async patch<T>(url: string, body: any, mapper: Mapper<T>, config?: AxiosRequestConfig): Promise<T> {
@@ -42,14 +42,14 @@ export const httpClient = {
             const res = await axiosInstance.patch(url, body, config);
             return mapper(res.data);
         } catch (e) {
-            return 'Error' as any
+            throw e;
         }
     },
     async delete(url: string, config?: AxiosRequestConfig): Promise<void> {
         try {
             await axiosInstance.delete(url, config);
         } catch (e) {
-            return 'Error' as any
+            throw e;
         }
     },
 };

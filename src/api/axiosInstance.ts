@@ -8,8 +8,8 @@ const axiosInstance = axios.create({baseURL: '', timeout: API_TIMEOUT_MS});
 
 console.log("[axios] created baseURL is"+ '');
 
+installLoggingInterceptor(axiosInstance);
 installHeaderInterceptor(axiosInstance);
 installRetryInterceptor(axiosInstance);
-installLoggingInterceptor(axiosInstance);
 
 export {axiosInstance};

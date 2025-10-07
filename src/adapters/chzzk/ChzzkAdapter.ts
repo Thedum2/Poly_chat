@@ -5,7 +5,7 @@ import {SocketClientOptions} from "../../sio/socket";
 import {ChzzkAuthOptions} from "../../models/Auth";
 import {chzzkAuthApi} from "../../api/modules/chzzk/auth";
 import {chzzkAuthStore} from "../../store/chzzkAuthStore";
-import {SYSTEM_MESSAGE_TYPE} from "../../api/model/chzzk/chzzkMessage";
+import {ConnectedMessageBody, SYSTEM_MESSAGE_TYPE} from "../../api/model/chzzk/chzzkMessage";
 import {chzzkMessageHandler} from "./chzzkMessageHandler";
 import {destroySocket, getSocket} from "../../sio/singleton";
 import {PLATFORM_NAME} from "../../api/config";
@@ -54,8 +54,8 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
             });
 
             chzzkAuthStore.getState().setTokens({
-                accessToken: tokenIssueResponse.accessToken,
-                refreshToken: tokenIssueResponse.refreshToken,
+                accessToken: tokenIssueResponse.content.accessToken,
+                refreshToken: tokenIssueResponse.content.refreshToken,
             });
 
             this._isAuthenticated = true;
@@ -75,8 +75,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
 
         try {
             const sessionResponse = await chzzkSessionApi.createClientSession();
-            this.opts.url = sessionResponse.url;
-
+            this.opts.url = sessionResponse.content.url;
             getSocket(this.opts).connect();
 
             getSocket(this.opts).on('connect', async () => { });
@@ -84,9 +83,10 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                 const result = chzzkMessageHandler.handleSystemMessage(data);
                 switch (result.type) {
                     case SYSTEM_MESSAGE_TYPE.CONNECTED:
-                        chzzkAuthStore.getState().setSessionKey(result.sessionKey);
-                        this._isConnected = true;
+                        const connectedMessageBody = result as ConnectedMessageBody;
+                        chzzkAuthStore.getState().setSessionKey(connectedMessageBody.data.sessionKey);
                         await this.subscribeAll();
+                        this._isConnected = true;
                         break;
                     case SYSTEM_MESSAGE_TYPE.SUBSCRIBED:
                         break;
@@ -149,10 +149,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
 
     private async subscribeToChat(): Promise<void> {
         const sessionKey = chzzkAuthStore.getState().sessionKey;
-        const channelId = chzzkAuthStore.getState().channelId;
-
-        if (!getSocket(this.opts) || !sessionKey || !channelId) return;
-
+        if (!getSocket(this.opts) || !sessionKey) return;
         await chzzkSessionApi.subscribeToChat({
             sessionKey,
         });
@@ -161,9 +158,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
 
     private async subscribeToDonation(): Promise<void> {
         const sessionKey = chzzkAuthStore.getState().sessionKey;
-        const channelId = chzzkAuthStore.getState().channelId;
-
-        if (!getSocket(this.opts) || !sessionKey || !channelId) return;
+        if (!getSocket(this.opts) || !sessionKey) return;
 
         await chzzkSessionApi.subscribeToDonation({
             sessionKey,
@@ -173,9 +168,8 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
 
     private async subscribeToSubscription(): Promise<void> {
         const sessionKey = chzzkAuthStore.getState().sessionKey;
-        const channelId = chzzkAuthStore.getState().channelId;
 
-        if (!getSocket(this.opts) || !sessionKey || !channelId) return;
+        if (!getSocket(this.opts) || !sessionKey) return;
 
         await chzzkSessionApi.subscribeToSubscription({
             sessionKey,
