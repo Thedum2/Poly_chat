@@ -34,42 +34,14 @@ export const chzzkAuthApi = {
     },
 
     //======================
-    // 3. 세션 생성 (클라이언트)
-    //======================
-    createClientSession: async (): Promise<SessionCreateClientResponse> => {
-        return httpClient.get(`${chzzkApiUrl}/open/v1/sessions/auth/client`, (data) => data as SessionCreateClientResponse);
-    },
-
-    //======================
-    // 4. 이벤트 구독 (채팅)
-    //======================
-    subscribeToChat: async (data: EventsSubscribeRequest): Promise<void> => {
-        await httpClient.post(`${chzzkApiUrl}/open/v1/sessions/events/subscribe/chat`, data, (data) => data);
-    },
-
-    //======================
-    // 5. 이벤트 구독 (후원)
-    //======================
-    subscribeToDonation: async (data: EventsSubscribeRequest): Promise<void> => {
-        await httpClient.post(`${chzzkApiUrl}/open/v1/sessions/events/subscribe/donation`, data, (data) => data);
-    },
-
-    //======================
-    // 6. 이벤트 구독 (구독)
-    //======================
-    subscribeToSubscription: async (data: EventsSubscribeRequest): Promise<void> => {
-        await httpClient.post(`${chzzkApiUrl}/open/v1/sessions/events/subscribe/subscription`, data, (data) => data);
-    },
-
-    //======================
-    // 7. 치지직 Access Token 갱신
+    // 3. 치지직 Access Token 갱신
     //======================
     refreshAccessToken: async (data: TokenRefreshRequest): Promise<TokenRefreshResponse> => {
         return httpClient.post(`${chzzkApiUrl}/auth/v1/token`, data, (data) => data as TokenRefreshResponse);
     },
 
     //======================
-    // 8. 치지직 Access Token 삭제
+    // 4. 치지직 Access Token 삭제
     //======================
     revokeAccessToken: async (data: TokenRevokeRequest): Promise<TokenRevokeResponse> => {
         return httpClient.post(`${chzzkApiUrl}/auth/v1/token/revoke`, data, (data) => data as TokenRevokeResponse);

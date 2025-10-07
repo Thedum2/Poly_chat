@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
-import { IChatAdapter } from '../ports/IChatAdapter';
-import { ChatMessage } from '../models/ChatMessage';
+import { IChatAdapter } from './ports/IChatAdapter';
+import { ChatMessage } from './models/ChatMessage';
 
 export class PolyChat extends EventEmitter {
   private readonly adapters: Map<string, IChatAdapter> = new Map();
@@ -32,11 +32,6 @@ export class PolyChat extends EventEmitter {
     return this.adapters.get(platform);
   }
 
-  async testAll() {
-      for (const adapter of this.adapters.values()) {
-          await adapter.test();
-      }
-  }
   async disconnectAll(): Promise<void> {
     for (const adapter of this.adapters.values()) {
       await adapter.disconnect();

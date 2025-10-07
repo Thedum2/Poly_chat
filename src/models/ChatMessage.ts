@@ -1,9 +1,8 @@
-import { User } from './User';
-
 export interface ChatMessage {
   platform: string;
-  id: string;
-  author: User;
+  chat_id: string;
+  nickname:string;
   content: string;
   timestamp: Date;
 }
+

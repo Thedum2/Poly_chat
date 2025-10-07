@@ -12,6 +12,4 @@ export interface IChatAdapter {
 
   on(event: 'message', listener: (message: ChatMessage) => void): this;
   on(event: 'error', listener: (error: Error) => void): this;
-
-  test(): Promise<string>;
 }
