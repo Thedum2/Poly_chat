@@ -38,18 +38,24 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
             script.async = true;
 
             script.onload = () => {
-                try {
-                    console.log('[SOOP] Chat SDK script loaded.');
-                    if (!window.ChatSDK) {
-                        throw new Error('window.ChatSDK is undefined after script load.');
+                // SDK 로드 후 약간의 지연을 줌 (초기화 시간)
+                setTimeout(() => {
+                    try {
+                        console.log('[SOOP] Chat SDK script loaded.');
+                        console.log('[SOOP] window.ChatSDK:', window.ChatSDK);
+                        console.log('[SOOP] Available global objects:', Object.keys(window).filter(k => k.toLowerCase().includes('chat') || k.toLowerCase().includes('soop')));
+
+                        if (!window.ChatSDK) {
+                            throw new Error('window.ChatSDK is undefined after script load. Check console for available global objects.');
+                        }
+                        this.chatSDK = new window.ChatSDK(options.clientId, options.clientSecret);
+                        this.chatSDK.openAuth();
+                        console.log('[SOOP] ChatSDK instance created and OAuth flow initiated.');
+                        resolve();
+                    } catch (e) {
+                        reject(e);
                     }
-                    this.chatSDK = new window.ChatSDK(options.clientId, options.clientSecret);
-                    this.chatSDK.openAuth();
-                    console.log('[SOOP] ChatSDK instance created and OAuth flow initiated.');
-                    resolve();
-                } catch (e) {
-                    reject(e);
-                }
+                }, 100);
             };
             script.onerror = (err) => {
                 console.error('[SOOP] Failed to load Chat SDK script.', err);

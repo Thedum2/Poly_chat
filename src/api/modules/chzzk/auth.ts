@@ -2,7 +2,6 @@ import { httpClient } from "../../httpClient";
 import { API_ENDPOINTS } from "../../config";
 import {
     AuthCodeRequest,
-    AuthCodeResponse,
     TokenIssueRequest,
     TokenIssueResponse,
     TokenRefreshRequest,
@@ -10,7 +9,6 @@ import {
     TokenRevokeRequest,
     TokenRevokeResponse
 } from "../../model/chzzk/auth";
-import { SessionCreateClientResponse, EventsSubscribeRequest } from "../../model/chzzk/session";
 
 const chzzkApiUrl = API_ENDPOINTS.Chzzk;
 
