@@ -5,10 +5,11 @@ import { ChatMessage } from '../../models/ChatMessage';
 import { soopAuthStore } from '../../store/soopAuthStore';
 import {ISoopChatSDK, ISoopChatSDKConstructor} from "../../api/model/soop/sdk";
 import {SoopAction, SoopMessage} from "../../api/model/soop/soopMessage";
+import { buildSoopAuthUrl } from "../../api/model/soop/auth";
 
 declare global {
     interface Window {
-        ChatSDK?: ISoopChatSDKConstructor;
+        SOOP?: ISoopChatSDKConstructor;
     }
 }
 
@@ -17,6 +18,8 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
     private _isAuthenticated = false;
     private _isConnected = false;
     private chatSDK: ISoopChatSDK | null = null;
+    private clientId: string = '';
+    private authPopup: Window | null = null;
 
     get isAuthenticated(): boolean {
         return this._isAuthenticated;
@@ -26,10 +29,10 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         return this._isConnected;
     }
 
-    async init(options: SoopInitOptions): Promise<void> {
+    async init(options: SoopInitOptions): Promise<string> {
         if (typeof window === 'undefined' || typeof document === 'undefined') {
             // SSR/Node 환경에서는 skip
-            return;
+            throw new Error('SOOP adapter requires browser environment');
         }
 
         await new Promise<void>((resolve, reject) => {
@@ -38,25 +41,16 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
             script.async = true;
 
             script.onload = () => {
-                // SDK 로드 후 약간의 지연을 줌 (초기화 시간)
                 setTimeout(() => {
                     try {
-                        console.log('[SOOP] Chat SDK script loaded.');
-                        console.log('[SOOP] window.ChatSDK:', window.ChatSDK);
-                        console.log('[SOOP] Available global objects:', Object.keys(window).filter(k => k.toLowerCase().includes('chat') || k.toLowerCase().includes('soop')));
-
-                        if (!window.ChatSDK) {
-                            throw new Error('window.ChatSDK is undefined after script load. Check console for available global objects.');
-                        }
-                        this.chatSDK = new window.ChatSDK(options.clientId, options.clientSecret);
-                        this.chatSDK.openAuth();
-                        console.log('[SOOP] ChatSDK instance created and OAuth flow initiated.');
+                        this.initializeChatSDK(options);
                         resolve();
                     } catch (e) {
                         reject(e);
                     }
-                }, 100);
+                }, 200);
             };
+
             script.onerror = (err) => {
                 console.error('[SOOP] Failed to load Chat SDK script.', err);
                 reject(new Error('Failed to load Soop Chat SDK'));
@@ -64,10 +58,108 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
 
             document.head.appendChild(script);
         });
+
+        try {
+            const code = await this.openAuthPopup();
+            console.log('[SOOP] OAuth code received:', code);
+            return code;
+        } catch (error) {
+            console.error('[SOOP] OAuth popup failed:', error);
+            this.emit('error', error);
+            throw error;
+        }
+    }
+
+    private initializeChatSDK(options: SoopInitOptions): void {
+        console.log('[SOOP] Chat SDK script loaded.');
+
+        if (!window.SOOP) {
+            throw new Error('SOOP Chat SDK not found on window.SOOP');
+        }
+
+        const ChatSDKConstructor = this.findChatSDKConstructor();
+        this.chatSDK = new ChatSDKConstructor(options.clientId, options.clientSecret);
+        this.clientId = options.clientId;
+        console.log('[SOOP] ChatSDK instance created.');
     }
 
     /**
-     * authCode로 토큰 발급 (init()이 먼저 호출되어 있어야 함)
+     * OAuth 팝업을 열고 인증 코드를 받아옵니다 (private - init()에서 자동 호출)
+     */
+    private openAuthPopup(): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const authUrl = buildSoopAuthUrl(this.clientId);
+
+            // 팝업 열기
+            this.authPopup = window.open(
+                authUrl,
+                'SOOP OAuth',
+                'width=500,height=700,left=100,top=100'
+            );
+
+            if (!this.authPopup) {
+                reject(new Error('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.'));
+                return;
+            }
+
+            // 팝업 URL 모니터링
+            const checkPopup = setInterval(() => {
+                try {
+                    if (this.authPopup && this.authPopup.closed) {
+                        clearInterval(checkPopup);
+                        reject(new Error('사용자가 OAuth 팝업을 닫았습니다.'));
+                        return;
+                    }
+
+                    // 팝업의 URL에서 code 추출 시도
+                    if (this.authPopup && this.authPopup.location.href.includes('code=')) {
+                        const url = new URL(this.authPopup.location.href);
+                        const code = url.searchParams.get('code');
+
+                        if (code) {
+                            clearInterval(checkPopup);
+                            this.authPopup.close();
+                            console.log('[SOOP] OAuth code received from popup:', code);
+                            resolve(code);
+                        }
+                    }
+                } catch (e) {
+                }
+            }, 500);
+
+            // 5분 타임아웃
+            setTimeout(() => {
+                clearInterval(checkPopup);
+                if (this.authPopup && !this.authPopup.closed) {
+                    this.authPopup.close();
+                }
+                reject(new Error('OAuth 인증 시간이 초과되었습니다.'));
+            }, 5 * 60 * 1000);
+        });
+    }
+
+    private findChatSDKConstructor(): ISoopChatSDKConstructor {
+        console.log('[SOOP] SOOP is an object. Keys:', Object.keys(window.SOOP!));
+
+        const possibleConstructors = [
+            (window.SOOP as any).ChatSDK,
+            (window.SOOP as any).default,
+            (window.SOOP as any).SDK,
+            (window.SOOP as any).Chat,
+        ];
+
+        for (const constructor of possibleConstructors) {
+            if (typeof constructor === 'function') {
+                console.log('[SOOP] Found constructor:', constructor.name || 'anonymous');
+                return constructor;
+            }
+        }
+
+        throw new Error(`SOOP ChatSDK constructor not found. Keys: ${Object.keys(window.SOOP!).join(', ')}`);
+    }
+
+    /**
+     * authCode로 토큰 발급 및 setAuth까지 진행 (init()이 먼저 호출되어 있어야 함)
      */
     async authenticate(options: SoopAuthOptions): Promise<void> {
         try {
@@ -75,19 +167,21 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
                 throw new Error('ChatSDK not initialized. Call init() first.');
             }
 
-            const tokens = await this.chatSDK.getAuth({ authCode: options.code });
+            console.log('[SOOP] Authenticating with auth code:', options.code);
+            const tokens = await this.chatSDK.getAuth(options.code);
             soopAuthStore.getState().setTokens({
                 accessToken: tokens.access_token,
                 refreshToken: tokens.refresh_token,
             });
 
+            // 토큰 받은 후 바로 setAuth 호출
+            this.chatSDK.setAuth(tokens.access_token);
+
             this._isAuthenticated = true;
-            this.emit('auth', true);
-            console.log('[SOOP] Authenticated with auth code.');
+            console.log('[SOOP] Authenticated and setAuth completed.');
         } catch (error: any) {
             console.error('[SOOP] Authentication failed:', error);
             this._isAuthenticated = false;
-            this.emit('auth', false);
             this.emit('error', error);
             throw error;
         }
@@ -98,15 +192,13 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
      */
     async connect(): Promise<void> {
         try {
-            const { accessToken } = soopAuthStore.getState();
-            if (!accessToken) {
-                throw new Error('No access token available for Soop connection.');
+            if (!this._isAuthenticated) {
+                throw new Error('Not authenticated. Call authenticate() first.');
             }
             if (!this.chatSDK) {
                 throw new Error('Soop ChatSDK not initialized. Call init()/authenticate() first.');
             }
 
-            this.chatSDK.setAuth(accessToken);
             await this.chatSDK.connect();
             this._isConnected = true;
             this.emit('connected');
@@ -158,7 +250,6 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         await this.disconnect();
         soopAuthStore.getState().clearTokens();
         this._isAuthenticated = false;
-        this.emit('auth', false);
         console.log('[SOOP] logged out.');
     }
 

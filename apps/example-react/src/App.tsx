@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChzzkDemo } from './components/ChzzkDemo';
 import { SoopDemo } from './components/SoopDemo';
 import './App.css';
@@ -6,17 +6,36 @@ import './App.css';
 type Platform = 'chzzk' | 'soop' | null;
 
 function App() {
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>(() => {
+    // Check for OAuth redirect first
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('code')) {
+      // If there's a code parameter, restore platform from localStorage
+      const saved = localStorage.getItem('selected_platform');
+      return saved as Platform;
+    }
+    // Start with null to show platform selection screen
+    return null;
+  });
+
+  // Save platform selection to localStorage
+  useEffect(() => {
+    if (selectedPlatform) {
+      localStorage.setItem('selected_platform', selectedPlatform);
+    } else {
+      localStorage.removeItem('selected_platform');
+    }
+  }, [selectedPlatform]);
 
   const handleReset = () => {
     setSelectedPlatform(null);
+    localStorage.removeItem('selected_platform');
   };
 
   return (
     <div className="app">
       <header className="app-header">
-        <h1>PolyChat React 데모</h1>
-        <p>다양한 플랫폼의 채팅을 하나의 인터페이스로 통합</p>
+        <h1>PolyChat React Demo</h1>
       </header>
 
       {!selectedPlatform ? (

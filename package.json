@@ -22,9 +22,7 @@
     "build": "tsup --config tsup.config.ts",
     "dev": "tsup --watch --config tsup.config.ts",
     "clean": "rimraf dist",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "demo": "tsx apps/example-node/src/demo.ts",
-    "prepublishOnly": "npm run clean && npm run build"
+    "demo": "npm run dev --workspace=polychat-example-react"
   },
   "devDependencies": {
     "@swc/core": "^1.6.13",

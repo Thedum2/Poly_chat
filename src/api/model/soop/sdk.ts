@@ -34,7 +34,7 @@ export interface SetSlowModeRequest {
 
 export interface ISoopChatSDK {
     openAuth(): void;
-    getAuth(request: GetAuthRequest): Promise<GetAuthResponse>;
+    getAuth(request: string): Promise<GetAuthResponse>;
     refreshAuth(request: RefreshAuthRequest): Promise<RefreshAuthResponse>;
     setAuth(accessToken: string): void;
     connect(): Promise<void>;

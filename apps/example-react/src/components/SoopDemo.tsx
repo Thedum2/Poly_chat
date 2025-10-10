@@ -6,35 +6,34 @@ export function SoopDemo() {
   const [clientSecret, setClientSecret] = useState('');
   const [code, setCode] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [status, setStatus] = useState('disconnected');
+  const [status, setStatus] = useState<'disconnected' | 'initialized' | 'authenticated' | 'connected'>('disconnected');
   const [error, setError] = useState('');
   const [systemEvents, setSystemEvents] = useState<any[]>([]);
 
   const adapterRef = useRef<SoopAdapter | null>(null);
 
-  // Load from env if available
+  // Load from env and localStorage on mount
   useEffect(() => {
     const envClientId = import.meta.env.VITE_SOOP_CLIENT_ID;
     const envClientSecret = import.meta.env.VITE_SOOP_CLIENT_SECRET;
+    const savedClientId = localStorage.getItem('soop_client_id');
+    const savedClientSecret = localStorage.getItem('soop_client_secret');
 
-    if (envClientId) setClientId(envClientId);
-    if (envClientSecret) setClientSecret(envClientSecret);
+    if (savedClientId) setClientId(savedClientId);
+    else if (envClientId) setClientId(envClientId);
+
+    if (savedClientSecret) setClientSecret(savedClientSecret);
+    else if (envClientSecret) setClientSecret(envClientSecret);
   }, []);
 
-  // Check URL params on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const codeParam = params.get('code');
-
-    if (codeParam) {
-      setCode(codeParam);
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
+  // No need to handle OAuth redirect anymore - using popup instead
 
   const handleInit = async () => {
     try {
       setError('');
+      localStorage.setItem('soop_client_id', clientId);
+      localStorage.setItem('soop_client_secret', clientSecret);
+
       const adapter = new SoopAdapter();
       adapterRef.current = adapter;
 
@@ -54,19 +53,16 @@ export function SoopDemo() {
         setStatus('disconnected');
       });
 
-      adapter.on('auth', (isAuth: boolean) => {
-        setStatus(isAuth ? 'authenticated' : 'disconnected');
-      });
-
       adapter.on('system', (event: any) => {
         setSystemEvents((prev) => [...prev, event]);
       });
 
-      await adapter.init({
+      const authCode = await adapter.init({
         clientId,
         clientSecret,
       });
 
+      setCode(authCode);
       setStatus('initialized');
     } catch (err: any) {
       setError(err.message);
@@ -136,7 +132,7 @@ export function SoopDemo() {
       )}
 
       <div className="info-box">
-        <strong>💡 참고:</strong> SOOP은 외부 SDK를 로드합니다. 초기화 시 OAuth 팝업이 자동으로 열립니다.
+        <strong>💡 참고:</strong> SOOP은 외부 SDK를 로드하며, 초기화 시 OAuth 팝업이 열립니다. 팝업 차단을 해제해주세요.
       </div>
 
       {/* Step 1: Initialize */}
