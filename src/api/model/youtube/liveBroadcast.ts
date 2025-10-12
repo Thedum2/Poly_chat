@@ -1,11 +1,5 @@
-// YouTube Live Broadcast API 타입
-
 export interface LiveBroadcastsListRequest {
-    part: string; // 'snippet,contentDetails,status'
-    broadcastStatus?: 'active' | 'all' | 'completed' | 'upcoming';
-    broadcastType?: 'all' | 'event' | 'persistent';
-    mine?: boolean;
-    maxResults?: number;
+    mine: boolean;
 }
 
 export interface LiveBroadcast {

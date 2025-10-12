@@ -46,7 +46,7 @@ function App() {
                 </div>
             ) : (
                 <div className="demo-container">
-                    <button className="reset-button" onClick={()=> setSelectedPlatform(null) as any as () => void}>
+                    <button className="reset-button" onClick={()=> setSelectedPlatform(null)}>
                         ← 플랫폼 다시 선택
                     </button>
                     {selectedPlatform === 'chzzk' && <ChzzkDemo/>}

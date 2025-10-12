@@ -98,7 +98,6 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                 }
 
                 try {
-                    // 팝업의 URL에 접근 시도
                     const popupUrl = this.authPopup?.location.href;
                     if (popupUrl) {
                         const url = new URL(popupUrl);
@@ -115,11 +114,8 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                         }
                     }
                 } catch (error) {
-                    // 팝업이 다른 도메인에 있을 때 발생하는 CORS 오류는 무시
                 }
             }, 500);
-
-            // 5분 타임아웃
             const timeout = setTimeout(() => {
                 if (!isResolved) {
                     cleanup();
@@ -144,7 +140,6 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                 clientSecret: options.clientSecret,
             });
 
-            // Use stored state if not provided in options
             const state = options.state || this.state;
             if (!state) {
                 throw new Error('State is required for authentication');
@@ -277,13 +272,6 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         await this.subscribeToDonation();
         await this.subscribeToSubscription();
     }
-
-    private getAccessTokenOrThrow(): string {
-        const t = chzzkAuthStore.getState().accessToken;
-        if (!t) throw new Error('No accessToken in store');
-        return t;
-    }
-
     private async subscribeToChat(): Promise<void> {
         const sessionKey = chzzkAuthStore.getState().sessionKey;
         if (!sessionKey) return;

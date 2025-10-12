@@ -174,13 +174,8 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
                 throw new Error('No access token available');
             }
 
-            // 활성 방송 목록 가져오기
-            const broadcastsResponse = await youtubeLiveBroadcastApi.listLiveBroadcasts(accessToken, {
-                part: 'snippet',
-                mine: true,
-            });
+            const broadcastsResponse = await youtubeLiveBroadcastApi.listLiveBroadcasts(accessToken, {mine: true});
 
-            // 방송 개수 체크 - 무조건 1개만 지원
             if (broadcastsResponse.items.length === 0) {
                 throw new Error('활성 방송을 찾을 수 없습니다. 라이브 스트리밍을 시작한 후 다시 시도해주세요.');
             }
@@ -227,7 +222,6 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
                     pageToken: this.nextPageToken || undefined,
                 });
 
-                // 새 메시지 처리
                 for (const item of response.items) {
                     if (item.snippet.type === 'textMessageEvent' && item.snippet.textMessageDetails) {
                         const msg: ChatMessage = {
@@ -241,21 +235,17 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
                     }
                 }
 
-                // 다음 폴링을 위한 토큰 저장
                 this.nextPageToken = response.nextPageToken || null;
 
-                // 다음 폴링 예약
                 const pollingInterval = response.pollingIntervalMillis || 5000;
                 this.pollingInterval = setTimeout(poll, pollingInterval);
             } catch (error) {
                 console.error('[YouTube] Polling error:', error);
                 this.emit('error', error);
-                // 에러 발생 시 5초 후 재시도
                 this.pollingInterval = setTimeout(poll, 5000);
             }
         };
 
-        // 첫 폴링 시작
         await poll();
     }
 

@@ -65,7 +65,7 @@ export function socket({
 
     const off = (event?: string, listener?: (...args: any[]) => void) => {
         if (event && listener) s.off(event, listener);
-        else if (event) (s as any).off(event); // v2: off(event) => 해당 이벤트 전체 제거
+        else if (event) (s as any).off(event);
         else {
             (s as any).callbacks = {};
         }

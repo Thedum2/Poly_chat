@@ -13,16 +13,9 @@ export const youtubeLiveBroadcastApi = {
     //======================
     listLiveBroadcasts: async (
         accessToken: string,
-        request: LiveBroadcastsListRequest
+        data: LiveBroadcastsListRequest
     ): Promise<LiveBroadcastsListResponse> => {
-        const params = new URLSearchParams({
-            part: request.part,
-            ...(request.broadcastStatus && { broadcastStatus: request.broadcastStatus }),
-            ...(request.broadcastType && { broadcastType: request.broadcastType }),
-            ...(request.mine !== undefined && { mine: String(request.mine) }),
-            ...(request.maxResults && { maxResults: String(request.maxResults) }),
-        });
-
+        const params = new URLSearchParams(data as any).toString();
         return httpClient.get(
             `${YOUTUBE_API_BASE_URL}/liveBroadcasts?${params.toString()}`,
             (data) => data as LiveBroadcastsListResponse,

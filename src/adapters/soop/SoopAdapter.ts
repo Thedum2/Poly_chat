@@ -100,7 +100,6 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
 
             let isResolved = false;
 
-            // 팝업 URL을 주기적으로 체크해서 code 파라미터 추출
             const checkPopupUrl = setInterval(() => {
                 if (this.authPopup && this.authPopup.closed) {
                     if (!isResolved) {
@@ -111,7 +110,6 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
                 }
 
                 try {
-                    // 팝업의 URL에 접근 시도
                     const popupUrl = this.authPopup?.location.href;
                     if (popupUrl) {
                         const url = new URL(popupUrl);
@@ -132,7 +130,6 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
                 }
             }, 500);
 
-            // 5분 타임아웃
             const timeout = setTimeout(() => {
                 if (!isResolved) {
                     cleanup();
@@ -184,7 +181,6 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
                 refreshToken: tokens.refresh_token,
             });
 
-            // 토큰 받은 후 바로 setAuth 호출
             this.chatSDK.setAuth(tokens.access_token);
 
             this._isAuthenticated = true;
@@ -223,14 +219,12 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
                 }
             });
 
-            // 채팅 종료
             this.chatSDK.handleChatClosed(() => {
                 this._isConnected = false;
                 this.emit('disconnected');
                 console.log('[SOOP] disconnected: chat closed.');
             });
 
-            // SDK 내부 에러
             this.chatSDK.handleError((code: string, message: string) => {
                 const err = new Error(`Soop SDK Error: ${code} - ${message}`);
                 console.error(err.message);
@@ -263,9 +257,6 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         console.log('[SOOP] logged out.');
     }
 
-    // --------------------------------
-    // 내부: Soop 이벤트 → ChatMessage 파싱
-    // --------------------------------
     private parseSoopEvent(action: SoopAction, soopMsg: SoopMessage): ChatMessage | null {
         if (action === 'MESSAGE' && soopMsg.action === 'MESSAGE') {
             const msg = soopMsg.message;

@@ -1,8 +1,6 @@
-// YouTube Live Chat Messages API 타입
-
 export interface LiveChatMessagesListRequest {
     liveChatId: string;
-    part: string; // 'snippet,authorDetails'
+    part: string;
     maxResults?: number;
     pageToken?: string;
 }
