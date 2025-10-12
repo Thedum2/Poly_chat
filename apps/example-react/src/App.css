@@ -109,6 +109,10 @@ body {
   border-color: #ff6b00;
 }
 
+.platform-button.youtube:hover {
+  border-color: #ff0000;
+}
+
 .platform-button h3 {
   margin: 0 0 0.75rem 0;
   font-size: 2rem;
@@ -122,6 +126,10 @@ body {
 
 .platform-button.soop h3 {
   color: #ff6b00;
+}
+
+.platform-button.youtube h3 {
+  color: #ff0000;
 }
 
 .platform-button p {

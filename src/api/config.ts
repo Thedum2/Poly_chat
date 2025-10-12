@@ -6,6 +6,14 @@ export const PLATFORM_NAME = {
 
 const isBrowser = typeof window !== 'undefined';
 
+export const youTubeScope = (): string => {
+    return [
+        'https://www.googleapis.com/auth/userinfo.email',
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'https://www.googleapis.com/auth/youtube.readonly',
+        'https://www.googleapis.com/auth/youtube'
+    ].join(' ');
+};
 export const API_ENDPOINTS = {
     Chzzk : isBrowser ? "/api/chzzk" : "https://openapi.chzzk.naver.com",
     Soop : isBrowser ? "/api/soop" : "https://api.sooplive.co.kr",

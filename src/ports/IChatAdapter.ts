@@ -6,7 +6,7 @@ export interface IChatAdapter {
   readonly isAuthenticated: boolean;
   readonly isConnected: boolean;
 
-  init(options: InitOptions): Promise<void | string>; // init can return void (for redirect) or string (for popup code)
+  init(options: InitOptions): Promise<void>;
   authenticate(options: AuthOptions): Promise<void>;
   connect(): Promise<void>;
   disconnect(): Promise<void>;

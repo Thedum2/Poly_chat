@@ -4,7 +4,6 @@ import { SoopAdapter, ChatMessage } from 'polychat-bridge';
 export function SoopDemo() {
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
-  const [redirectUri, setRedirectUri] = useState('');
   const [code, setCode] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<'disconnected' | 'initialized' | 'authenticated' | 'connected'>('disconnected');
@@ -17,19 +16,14 @@ export function SoopDemo() {
   useEffect(() => {
     const envClientId = import.meta.env.VITE_SOOP_CLIENT_ID;
     const envClientSecret = import.meta.env.VITE_SOOP_CLIENT_SECRET;
-    const envRedirectUri = import.meta.env.VITE_SOOP_REDIRECT_URI;
     const savedClientId = localStorage.getItem('soop_client_id');
     const savedClientSecret = localStorage.getItem('soop_client_secret');
-    const savedRedirectUri = localStorage.getItem('soop_redirect_uri');
 
     if (savedClientId) setClientId(savedClientId);
     else if (envClientId) setClientId(envClientId);
 
     if (savedClientSecret) setClientSecret(savedClientSecret);
     else if (envClientSecret) setClientSecret(envClientSecret);
-
-    if (savedRedirectUri) setRedirectUri(savedRedirectUri);
-    else if (envRedirectUri) setRedirectUri(envRedirectUri);
   }, []);
 
   // No need to handle OAuth redirect anymore - using popup instead
@@ -39,7 +33,6 @@ export function SoopDemo() {
       setError('');
       localStorage.setItem('soop_client_id', clientId);
       localStorage.setItem('soop_client_secret', clientSecret);
-      localStorage.setItem('soop_redirect_uri', redirectUri);
 
       const adapter = new SoopAdapter();
       adapterRef.current = adapter;
@@ -67,7 +60,6 @@ export function SoopDemo() {
       const authCode = await adapter.init({
         clientId,
         clientSecret,
-        redirectUri,
       });
 
       setCode(authCode);
@@ -144,92 +136,85 @@ export function SoopDemo() {
       </div>
 
       {/* Step 1: Initialize */}
-      {status === 'disconnected' && (
-        <div className="step-card">
-          <h3>1️⃣ 초기화</h3>
-          <div className="form-group">
-            <label>Client ID</label>
-            <input
-              type="text"
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              placeholder="SOOP Client ID 입력"
-            />
-          </div>
-          <div className="form-group">
-            <label>Client Secret</label>
-            <input
-              type="password"
-              value={clientSecret}
-              onChange={(e) => setClientSecret(e.target.value)}
-              placeholder="SOOP Client Secret 입력"
-            />
-          </div>
-          <div className="form-group">
-            <label>Redirect URI</label>
-            <input
-              type="text"
-              value={redirectUri}
-              onChange={(e) => setRedirectUri(e.target.value)}
-              placeholder="예: http://localhost:5173/soop-callback.html"
-            />
-          </div>
-          <button className="btn btn-primary" onClick={handleInit}>
-            초기화 및 OAuth 시작
-          </button>
+      <div className="step-card">
+        <h3>{status !== 'disconnected' ? '✅' : '1️⃣'} 초기화</h3>
+        <div className="form-group">
+          <label>Client ID</label>
+          <input
+            type="text"
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+            placeholder="SOOP Client ID 입력"
+            disabled={status !== 'disconnected'}
+          />
         </div>
-      )}
+        <div className="form-group">
+          <label>Client Secret</label>
+          <input
+            type="password"
+            value={clientSecret}
+            onChange={(e) => setClientSecret(e.target.value)}
+            placeholder="SOOP Client Secret 입력"
+            disabled={status !== 'disconnected'}
+          />
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={handleInit}
+          disabled={status !== 'disconnected'}
+        >
+          초기화 및 OAuth 시작
+        </button>
+      </div>
 
       {/* Step 2: Authenticate */}
-      {status === 'initialized' && (
-        <div className="step-card">
-          <h3>2️⃣ 인증</h3>
-          <p>OAuth 팝업에서 인증을 완료한 후, 리다이렉트된 URL에서 code를 입력하세요.</p>
+      <div className="step-card">
+        <h3>{status === 'authenticated' || status === 'connected' ? '✅' : '2️⃣'} 인증</h3>
+        {status === 'initialized' && (
+          <p>OAuth 팝업에서 인증을 완료한 후, 인증을 진행하세요.</p>
+        )}
 
-          {code && (
-            <div className="auth-success">
-              <p>✅ 인증 코드가 자동으로 입력되었습니다!</p>
-            </div>
-          )}
-
-          <div className="form-group">
-            <label>Authorization Code</label>
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="자동 입력됨 (또는 수동 입력)"
-            />
+        {code && (
+          <div className="auth-success">
+            <p>✅ 인증 코드가 자동으로 입력되었습니다!</p>
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={handleAuthenticate}
-            disabled={!code}
-          >
-            인증 완료
-          </button>
+        )}
+
+        <div className="form-group">
+          <label>Authorization Code</label>
+          <input
+            type="text"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="자동 입력됨 (또는 수동 입력)"
+            disabled={status !== 'initialized'}
+          />
         </div>
-      )}
+        <button
+          className="btn btn-primary"
+          onClick={handleAuthenticate}
+          disabled={status !== 'initialized' || !code}
+        >
+          인증 완료
+        </button>
+      </div>
 
       {/* Step 3: Connect */}
-      {status === 'authenticated' && (
-        <div className="step-card">
-          <h3>3️⃣ 연결</h3>
-          <button className="btn btn-success" onClick={handleConnect}>
-            📡 채팅 서버 연결
-          </button>
-        </div>
-      )}
-
-      {/* Connected */}
-      {status === 'connected' && (
-        <div className="step-card">
-          <h3>✅ 연결됨</h3>
-          <button className="btn btn-danger" onClick={handleDisconnect}>
+      <div className="step-card">
+        <h3>{status === 'connected' ? '✅' : '3️⃣'} 연결</h3>
+        <button
+          className="btn btn-success"
+          onClick={handleConnect}
+          disabled={status !== 'authenticated'}
+        >
+          📡 채팅 서버 연결
+        </button>
+        {status === 'connected' && (
+          <button className="btn btn-danger" onClick={handleDisconnect} style={{marginLeft: '10px'}}>
             🔌 연결 해제
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Messages */}
       {messages.length > 0 && (

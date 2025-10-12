@@ -19,6 +19,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
     private _isConnected = false;
     private chatSDK: ISoopChatSDK | null = null;
     private clientId: string = '';
+    private code: string = '';
     private authPopup: Window | null = null;
 
     get isAuthenticated(): boolean {
@@ -29,7 +30,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         return this._isConnected;
     }
 
-    async init(options: SoopInitOptions): Promise<string> {
+    async init(options: SoopInitOptions): Promise<void> {
         if (typeof window === 'undefined' || typeof document === 'undefined') {
             // SSR/Node 환경에서는 skip
             throw new Error('SOOP adapter requires browser environment');
@@ -60,9 +61,8 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         });
 
         try {
-            const code = await this.openAuthPopup();
-            console.log('[SOOP] OAuth code received:', code);
-            return code;
+            this.code = await this.openAuthPopup();
+            console.log('[SOOP] OAuth code received:');
         } catch (error) {
             console.error('[SOOP] OAuth popup failed:', error);
             this.emit('error', error);
@@ -178,9 +178,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
             if (!this.chatSDK) {
                 throw new Error('ChatSDK not initialized. Call init() first.');
             }
-
-            console.log('[SOOP] Authenticating with auth code:', options.code);
-            const tokens = await this.chatSDK.getAuth(options.code);
+            const tokens = await this.chatSDK.getAuth(this.code);
             soopAuthStore.getState().setTokens({
                 accessToken: tokens.access_token,
                 refreshToken: tokens.refresh_token,
