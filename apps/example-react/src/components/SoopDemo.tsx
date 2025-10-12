@@ -4,6 +4,7 @@ import { SoopAdapter, ChatMessage } from 'polychat-bridge';
 export function SoopDemo() {
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [redirectUri, setRedirectUri] = useState('');
   const [code, setCode] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [status, setStatus] = useState<'disconnected' | 'initialized' | 'authenticated' | 'connected'>('disconnected');
@@ -16,14 +17,19 @@ export function SoopDemo() {
   useEffect(() => {
     const envClientId = import.meta.env.VITE_SOOP_CLIENT_ID;
     const envClientSecret = import.meta.env.VITE_SOOP_CLIENT_SECRET;
+    const envRedirectUri = import.meta.env.VITE_SOOP_REDIRECT_URI;
     const savedClientId = localStorage.getItem('soop_client_id');
     const savedClientSecret = localStorage.getItem('soop_client_secret');
+    const savedRedirectUri = localStorage.getItem('soop_redirect_uri');
 
     if (savedClientId) setClientId(savedClientId);
     else if (envClientId) setClientId(envClientId);
 
     if (savedClientSecret) setClientSecret(savedClientSecret);
     else if (envClientSecret) setClientSecret(envClientSecret);
+
+    if (savedRedirectUri) setRedirectUri(savedRedirectUri);
+    else if (envRedirectUri) setRedirectUri(envRedirectUri);
   }, []);
 
   // No need to handle OAuth redirect anymore - using popup instead
@@ -33,6 +39,7 @@ export function SoopDemo() {
       setError('');
       localStorage.setItem('soop_client_id', clientId);
       localStorage.setItem('soop_client_secret', clientSecret);
+      localStorage.setItem('soop_redirect_uri', redirectUri);
 
       const adapter = new SoopAdapter();
       adapterRef.current = adapter;
@@ -60,6 +67,7 @@ export function SoopDemo() {
       const authCode = await adapter.init({
         clientId,
         clientSecret,
+        redirectUri,
       });
 
       setCode(authCode);
@@ -155,6 +163,15 @@ export function SoopDemo() {
               value={clientSecret}
               onChange={(e) => setClientSecret(e.target.value)}
               placeholder="SOOP Client Secret 입력"
+            />
+          </div>
+          <div className="form-group">
+            <label>Redirect URI</label>
+            <input
+              type="text"
+              value={redirectUri}
+              onChange={(e) => setRedirectUri(e.target.value)}
+              placeholder="예: http://localhost:5173/soop-callback.html"
             />
           </div>
           <button className="btn btn-primary" onClick={handleInit}>

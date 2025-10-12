@@ -32,6 +32,7 @@ VITE_CHZZK_CLIENT_ID=your_client_id
 VITE_CHZZK_CLIENT_SECRET=your_client_secret
 VITE_SOOP_CLIENT_ID=your_client_id
 VITE_SOOP_CLIENT_SECRET=your_client_secret
+VITE_SOOP_REDIRECT_URI=http://localhost:5173/soop-callback.html
 ```
 
 환경 변수가 없어도 UI에서 직접 입력할 수 있습니다.
@@ -60,19 +61,22 @@ VITE_SOOP_CLIENT_SECRET=your_client_secret
 
 ### 3. SOOP 사용하기
 
-1. **초기화**: Client ID와 Client Secret 입력 (환경 변수 설정 시 자동 입력됨)
+1. **초기화**: Client ID, Client Secret, Redirect URI 입력 (환경 변수 설정 시 자동 입력됨)
    - "초기화 및 OAuth 시작" 버튼 클릭
-   - SOOP SDK가 자동으로 OAuth 팝업을 엽니다
-2. **인증**: 팝업에서 로그인 완료 후 리다이렉트된 URL에서 `code` 확인
-   - URL 파라미터에 code가 포함되어 있으면 자동으로 입력됨
-3. **인증 완료**: "인증 완료" 버튼 클릭
+   - OAuth 팝업이 자동으로 열립니다
+2. **인증**: 팝업에서 로그인 완료
+   - 팝업이 `soop-callback.html`로 리다이렉트되어 자동으로 인증 코드를 전송합니다
+   - `postMessage` API를 통해 부모 창에 안전하게 code가 전달됩니다
+3. **인증 완료**: 자동 입력된 코드 확인 후 "인증 완료" 버튼 클릭
 4. **연결**: "📡 채팅 서버 연결" 버튼 클릭
 
 #### SOOP 개발자 등록
 
 1. [SOOP 개발자 센터](https://developers.sooplive.co.kr/) 접속
 2. 애플리케이션 등록
-3. Client ID와 Client Secret 확보
+3. **중요**: Redirect URI에 `http://localhost:5173/soop-callback.html` 추가
+   - 프로덕션 환경에서는 실제 도메인으로 변경 (예: `https://yourdomain.com/soop-callback.html`)
+4. Client ID와 Client Secret 확보
 
 ## 주요 기능
 

@@ -5,7 +5,7 @@ import { ChatMessage } from '../../models/ChatMessage';
 import { soopAuthStore } from '../../store/soopAuthStore';
 import {ISoopChatSDK, ISoopChatSDKConstructor} from "../../api/model/soop/sdk";
 import {SoopAction, SoopMessage} from "../../api/model/soop/soopMessage";
-import { buildSoopAuthUrl } from "../../api/model/soop/auth";
+import {buildSoopAuthUrl} from "../../api/modules/soop/auth";
 
 declare global {
     interface Window {
@@ -83,14 +83,10 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         console.log('[SOOP] ChatSDK instance created.');
     }
 
-    /**
-     * OAuth 팝업을 열고 인증 코드를 받아옵니다 (private - init()에서 자동 호출)
-     */
     private openAuthPopup(): Promise<string> {
         return new Promise((resolve, reject) => {
             const authUrl = buildSoopAuthUrl(this.clientId);
 
-            // 팝업 열기
             this.authPopup = window.open(
                 authUrl,
                 'SOOP OAuth',
@@ -102,39 +98,55 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
                 return;
             }
 
-            // 팝업 URL 모니터링
-            const checkPopup = setInterval(() => {
-                try {
-                    if (this.authPopup && this.authPopup.closed) {
-                        clearInterval(checkPopup);
-                        reject(new Error('사용자가 OAuth 팝업을 닫았습니다.'));
-                        return;
-                    }
+            let isResolved = false;
 
-                    // 팝업의 URL에서 code 추출 시도
-                    if (this.authPopup && this.authPopup.location.href.includes('code=')) {
-                        const url = new URL(this.authPopup.location.href);
+            // 팝업 URL을 주기적으로 체크해서 code 파라미터 추출
+            const checkPopupUrl = setInterval(() => {
+                if (this.authPopup && this.authPopup.closed) {
+                    if (!isResolved) {
+                        cleanup();
+                        reject(new Error('사용자가 OAuth 팝업을 닫았습니다.'));
+                    }
+                    return;
+                }
+
+                try {
+                    // 팝업의 URL에 접근 시도
+                    const popupUrl = this.authPopup?.location.href;
+                    if (popupUrl) {
+                        const url = new URL(popupUrl);
                         const code = url.searchParams.get('code');
 
                         if (code) {
-                            clearInterval(checkPopup);
-                            this.authPopup.close();
-                            console.log('[SOOP] OAuth code received from popup:', code);
+                            isResolved = true;
+                            cleanup();
+                            if (this.authPopup && !this.authPopup.closed) {
+                                this.authPopup.close();
+                            }
+                            console.log('[SOOP] OAuth code received from URL:', code);
                             resolve(code);
                         }
                     }
-                } catch (e) {
+                } catch (error) {
+
                 }
             }, 500);
 
             // 5분 타임아웃
-            setTimeout(() => {
-                clearInterval(checkPopup);
-                if (this.authPopup && !this.authPopup.closed) {
-                    this.authPopup.close();
+            const timeout = setTimeout(() => {
+                if (!isResolved) {
+                    cleanup();
+                    if (this.authPopup && !this.authPopup.closed) {
+                        this.authPopup.close();
+                    }
+                    reject(new Error('OAuth 인증 시간이 초과되었습니다.'));
                 }
-                reject(new Error('OAuth 인증 시간이 초과되었습니다.'));
             }, 5 * 60 * 1000);
+
+            const cleanup = () => {
+                clearInterval(checkPopupUrl);
+                clearTimeout(timeout);
+            };
         });
     }
 
