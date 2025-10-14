@@ -4,7 +4,7 @@ import { SoopInitOptions, SoopAuthOptions } from '../../models/Auth';
 import { ChatMessage } from '../../models/ChatMessage';
 import { soopAuthStore } from '../../store/soopAuthStore';
 import {ISoopChatSDK, ISoopChatSDKConstructor} from "../../api/model/soop/sdk";
-import {SoopAction, SoopMessage} from "../../api/model/soop/soopMessage";
+import {SOOP_ACTION, SoopAction, SoopMessage} from "../../api/model/soop/soopMessage";
 import {buildSoopAuthUrl} from "../../api/modules/soop/auth";
 
 declare global {
@@ -211,11 +211,11 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
             console.log('[SOOP] connected.');
 
             this.chatSDK.handleMessageReceived((action: SoopAction, message: SoopMessage) => {
+                console.log('[SOOP] Received action:', action, message);
+
                 const parsed = this.parseSoopEvent(action, message);
                 if (parsed) {
                     this.emit('message', parsed);
-                } else {
-                    this.emit('system', { action, payload: message });
                 }
             });
 
@@ -257,25 +257,23 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         console.log('[SOOP] logged out.');
     }
 
-    private parseSoopEvent(action: SoopAction, soopMsg: SoopMessage): ChatMessage | null {
-        if (action === 'MESSAGE' && soopMsg.action === 'MESSAGE') {
-            const msg = soopMsg.message;
+    private parseSoopEvent(action: SoopAction, soopMsg: any): ChatMessage | null {
+        if (action === SOOP_ACTION.MESSAGE) {
             return {
                 platform: this.platform,
-                chat_id: msg.userId,
-                nickname: msg.userNickname,
-                content: msg.message,
+                chat_id: 'unknown',
+                nickname: soopMsg.userNickname || 'Unknown',
+                content: soopMsg.message || '',
                 timestamp: new Date(),
             };
         }
 
-        if (action === 'MANAGER_MESSAGE' && soopMsg.action === 'MANAGER_MESSAGE') {
-            const msg = soopMsg.message;
+        if (action === SOOP_ACTION.MANAGER_MESSAGE) {
             return {
                 platform: this.platform,
-                chat_id: msg.userId,
-                nickname: msg.userNickname,
-                content: msg.message,
+                chat_id: 'unknown',
+                nickname: soopMsg.userNickname || 'Unknown',
+                content: soopMsg.message || '',
                 timestamp: new Date(),
             };
         }

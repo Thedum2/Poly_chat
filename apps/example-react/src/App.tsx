@@ -111,9 +111,11 @@ function App() {
       // Set up event listeners
       adapter.on('message', (message: ChatMessage) => {
         console.log(`[${platform.toUpperCase()}] Message received:`, message);
+        // SYSTEM 닉네임을 가진 메시지는 시스템 메시지로 표시
+        const isSystemMessage = message.nickname === 'SYSTEM';
         setMessages((prev) => [...prev, {
           platform,
-          type: 'chat',
+          type: isSystemMessage ? 'system' : 'chat',
           nickname: message.nickname,
           content: message.content,
           timestamp: message.timestamp,
