@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import './App.css';
 import { ChzzkAdapter, SoopAdapter, YouTubeAdapter, ChatMessage } from 'polychat-bridge';
 
@@ -8,6 +8,7 @@ interface PlatformConfig {
   clientId: string;
   clientSecret: string;
   redirectUri?: string;
+  pollingIntervalSeconds?: number;
 }
 
 interface AdapterState {
@@ -17,11 +18,32 @@ interface AdapterState {
   config: PlatformConfig;
 }
 
+type MessageType = 'chat' | 'system';
+
+interface DisplayMessage {
+  platform: Platform;
+  type: MessageType;
+  nickname: string;
+  content: string;
+  timestamp: Date;
+  chat_id?: string;
+}
+
 function App() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<Platform>>(new Set());
   const [adapters, setAdapters] = useState<Map<Platform, AdapterState>>(new Map());
-  const [messages, setMessages] = useState<(ChatMessage & { platform: Platform })[]>([]);
+  const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [isConfigured, setIsConfigured] = useState(false);
+
+  const addSystemMessage = (platform: Platform, content: string) => {
+    setMessages((prev) => [...prev, {
+      platform,
+      type: 'system',
+      nickname: 'SYSTEM',
+      content,
+      timestamp: new Date(),
+    }]);
+  };
 
   // Platform configurations
   const [configs, setConfigs] = useState<Record<Platform, PlatformConfig>>({
@@ -38,6 +60,7 @@ function App() {
       clientId: import.meta.env.VITE_YOUTUBE_CLIENT_ID || '',
       clientSecret: import.meta.env.VITE_YOUTUBE_CLIENT_SECRET || '',
       redirectUri: 'http://localhost:3000/callback',
+      pollingIntervalSeconds: 5, // 기본값 5초
     },
   });
 
@@ -53,12 +76,12 @@ function App() {
     });
   };
 
-  const updateConfig = (platform: Platform, key: keyof PlatformConfig, value: string) => {
+  const updateConfig = (platform: Platform, key: keyof PlatformConfig, value: string | number) => {
     setConfigs((prev) => ({
       ...prev,
       [platform]: {
         ...prev[platform],
-        [key]: value,
+        [key]: key === 'pollingIntervalSeconds' ? Number(value) : value,
       },
     }));
   };
@@ -87,27 +110,74 @@ function App() {
 
       // Set up event listeners
       adapter.on('message', (message: ChatMessage) => {
-        setMessages((prev) => [...prev, { ...message, platform }]);
+        console.log(`[${platform.toUpperCase()}] Message received:`, message);
+        setMessages((prev) => [...prev, {
+          platform,
+          type: 'chat',
+          nickname: message.nickname,
+          content: message.content,
+          timestamp: message.timestamp,
+          chat_id: message.chat_id,
+        }]);
       });
 
       adapter.on('error', (err: Error) => {
+        console.log(`[${platform.toUpperCase()}] Error:`, err);
         updateAdapterState(platform, { error: err.message });
+        addSystemMessage(platform, `❌ 오류 발생: ${err.message}`);
       });
 
       adapter.on('connected', () => {
+        console.log(`[${platform.toUpperCase()}] Connected`);
         updateAdapterState(platform, { status: 'connected' });
+        addSystemMessage(platform, '✅ 채팅 서버에 연결되었습니다');
       });
 
       adapter.on('disconnected', () => {
+        console.log(`[${platform.toUpperCase()}] Disconnected`);
         updateAdapterState(platform, { status: 'disconnected' });
+        addSystemMessage(platform, '⚠️ 채팅 서버 연결이 해제되었습니다');
       });
 
       adapter.on('auth', (isAuth: boolean) => {
+        console.log(`[${platform.toUpperCase()}] Auth:`, isAuth);
         updateAdapterState(platform, { status: isAuth ? 'authenticated' : 'disconnected' });
+        if (isAuth) {
+          addSystemMessage(platform, '🔑 인증에 성공했습니다');
+        } else {
+          addSystemMessage(platform, '❌ 인증에 실패했습니다');
+        }
       });
 
       // Initialize - init now handles code internally
-      await adapter.init(config);
+      if (platform === 'chzzk') {
+        // CHZZK requires redirectUri
+        if (!config.redirectUri) {
+          throw new Error('redirectUri is required for CHZZK');
+        }
+        await (adapter as ChzzkAdapter).init({
+          clientId: config.clientId,
+          clientSecret: config.clientSecret,
+          redirectUri: config.redirectUri,
+        });
+      } else if (platform === 'youtube') {
+        // YouTube requires redirectUri
+        if (!config.redirectUri) {
+          throw new Error('redirectUri is required for YouTube');
+        }
+        await (adapter as YouTubeAdapter).init({
+          clientId: config.clientId,
+          clientSecret: config.clientSecret,
+          redirectUri: config.redirectUri,
+          pollingIntervalSeconds: config.pollingIntervalSeconds,
+        });
+      } else {
+        // SOOP doesn't require redirectUri
+        await (adapter as SoopAdapter).init({
+          clientId: config.clientId,
+          clientSecret: config.clientSecret,
+        });
+      }
 
       setAdapters((prev) => {
         const next = new Map(prev);
@@ -130,7 +200,23 @@ function App() {
 
     try {
       const config = configs[platform];
-      await adapterState.adapter.authenticate(config);
+
+      if (platform === 'chzzk') {
+        await (adapterState.adapter as ChzzkAdapter).authenticate({
+          clientId: config.clientId,
+          clientSecret: config.clientSecret,
+          redirectUri: config.redirectUri || '',
+          state: '', // adapter internal state will be used
+        });
+      } else if (platform === 'soop') {
+        await (adapterState.adapter as SoopAdapter).authenticate({
+          clientId: config.clientId,
+          clientSecret: config.clientSecret,
+        });
+      } else if (platform === 'youtube') {
+        await (adapterState.adapter as YouTubeAdapter).authenticate({});
+      }
+
       updateAdapterState(platform, { status: 'authenticated', error: '' });
     } catch (err: any) {
       updateAdapterState(platform, { error: err.message });
@@ -173,7 +259,7 @@ function App() {
   };
 
   const handleReset = () => {
-    adapters.forEach((state, platform) => {
+    adapters.forEach((state) => {
       state.adapter.disconnect().catch(() => {});
     });
     setAdapters(new Map());
@@ -255,6 +341,30 @@ function App() {
                           onChange={(e) => updateConfig(platform, 'redirectUri', e.target.value)}
                           placeholder="Redirect URI 입력"
                         />
+                      </div>
+                    )}
+                    {platform === 'youtube' && (
+                      <div className="form-field">
+                        <label>Polling 간격 (초)</label>
+                        <select
+                          value={configs[platform].pollingIntervalSeconds || 5}
+                          onChange={(e) => updateConfig(platform, 'pollingIntervalSeconds', e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '0.75rem 1rem',
+                            background: '#0f0f0f',
+                            border: '1px solid #1a1a1a',
+                            color: '#ffffff',
+                            fontSize: '0.9375rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((seconds) => (
+                            <option key={seconds} value={seconds}>
+                              {seconds}초
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     )}
                   </div>
@@ -364,7 +474,7 @@ function App() {
               </div>
             ) : (
               messages.map((msg, idx) => (
-                <div key={idx} className="chat-message">
+                <div key={idx} className={`chat-message ${msg.type === 'system' ? 'system-message' : ''}`}>
                   <span
                     className="platform-badge"
                     style={{ backgroundColor: getPlatformColor(msg.platform) }}
@@ -373,10 +483,14 @@ function App() {
                   </span>
                   <div className="message-body">
                     <div className="message-meta">
-                      <span className="message-author">{msg.nickname}</span>
+                      <span className={`message-author ${msg.type === 'system' ? 'system-author' : ''}`}>
+                        {msg.nickname}
+                      </span>
                       <span className="message-time">{msg.timestamp.toLocaleTimeString()}</span>
                     </div>
-                    <div className="message-text">{msg.content}</div>
+                    <div className={`message-text ${msg.type === 'system' ? 'system-text' : ''}`}>
+                      {msg.content}
+                    </div>
                   </div>
                 </div>
               ))

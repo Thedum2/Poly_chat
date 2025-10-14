@@ -438,6 +438,26 @@ body {
   word-wrap: break-word;
 }
 
+/* System Messages */
+.chat-message.system-message {
+  background: #0a0a14;
+  border-color: #1a1a2a;
+}
+
+.message-author.system-author {
+  color: #8888ff;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.message-text.system-text {
+  color: #aaaadd;
+  font-style: italic;
+  font-weight: 500;
+}
+
 /* Footer */
 .app-footer {
   background: #000000;

@@ -21,6 +21,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
     private liveChatId: string | null = null;
     private pollingInterval: NodeJS.Timeout | null = null;
     private nextPageToken: string | null = null;
+    private pollingIntervalMs: number = 5000; // 기본값 5초
 
     get isAuthenticated(): boolean {
         return this._isAuthenticated;
@@ -41,6 +42,13 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
         this.clientId = options.clientId;
         this.clientSecret = options.clientSecret;
         this.redirectUri = options.redirectUri;
+
+        if (options.pollingIntervalSeconds !== undefined) {
+            if (options.pollingIntervalSeconds < 1 || options.pollingIntervalSeconds > 10) {
+                throw new Error('pollingIntervalSeconds must be between 1 and 10 seconds');
+            }
+            this.pollingIntervalMs = options.pollingIntervalSeconds * 1000;
+        }
 
         try {
             await this.openAuthPopup();
@@ -237,12 +245,14 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
 
                 this.nextPageToken = response.nextPageToken || null;
 
-                const pollingInterval = response.pollingIntervalMillis || 5000;
+                // Use configured polling interval, fallback to API response or default
+                const pollingInterval = this.pollingIntervalMs;
                 this.pollingInterval = setTimeout(poll, pollingInterval);
             } catch (error) {
                 console.error('[YouTube] Polling error:', error);
                 this.emit('error', error);
-                this.pollingInterval = setTimeout(poll, 5000);
+                // Retry with configured polling interval
+                this.pollingInterval = setTimeout(poll, this.pollingIntervalMs);
             }
         };
 

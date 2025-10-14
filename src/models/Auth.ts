@@ -15,6 +15,7 @@ export interface YouTubeInitOptions extends InitOptions{
     clientId: string;
     clientSecret: string;
     redirectUri: string;
+    pollingIntervalSeconds?: number;
 }
 export interface AuthOptions {}
 

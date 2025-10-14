@@ -221,7 +221,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
 
                 const msg: ChatMessage = {
                     platform: PLATFORM_NAME.CHZZK,
-                    chat_id: (chatEvent as any)?.messageId ?? 0,
+                    chat_id: String((chatEvent as any)?.messageId ?? 0),
                     nickname: chatEvent.profile?.nickname ?? 'unknown',
                     content: chatEvent.content ?? '',
                     timestamp: new Date((chatEvent as any)?.timestamp ?? Date.now()),
