@@ -2,6 +2,14 @@ import { EventEmitter } from 'events';
 import { IChatAdapter } from './ports/IChatAdapter';
 import { ChatMessage } from './models/ChatMessage';
 
+export interface PolyChatEvents {
+  message: (data: { platform: string; message: ChatMessage }) => void;
+  error: (data: { platform: string; error: Error }) => void;
+  connected: (data: { platform: string }) => void;
+  auth: (data: { platform: string; isAuthenticated: boolean }) => void;
+  disconnected: (data: { platform: string }) => void;
+}
+
 export class PolyChat extends EventEmitter {
   private readonly adapters: Map<string, IChatAdapter> = new Map();
 
@@ -21,10 +29,23 @@ export class PolyChat extends EventEmitter {
 
   private listenToAdapterEvents(adapter: IChatAdapter): void {
     adapter.on('message', (message: ChatMessage) => {
-      this.emit('message', message);
+      this.emit('message', { platform: adapter.platform, message });
     });
+
     adapter.on('error', (error: Error) => {
       this.emit('error', { platform: adapter.platform, error });
+    });
+
+    adapter.on('connected', () => {
+      this.emit('connected', { platform: adapter.platform });
+    });
+
+    adapter.on('auth', (isAuthenticated: boolean) => {
+      this.emit('auth', { platform: adapter.platform, isAuthenticated });
+    });
+
+    adapter.on('disconnected', () => {
+      this.emit('disconnected', { platform: adapter.platform });
     });
   }
 
@@ -36,5 +57,27 @@ export class PolyChat extends EventEmitter {
     for (const adapter of this.adapters.values()) {
       await adapter.disconnect();
     }
+  }
+
+  // Type-safe event emitter methods
+  public override on<K extends keyof PolyChatEvents>(
+    event: K,
+    listener: PolyChatEvents[K]
+  ): this {
+    return super.on(event, listener);
+  }
+
+  public override emit<K extends keyof PolyChatEvents>(
+    event: K,
+    ...args: Parameters<PolyChatEvents[K]>
+  ): boolean {
+    return super.emit(event, ...args);
+  }
+
+  public override off<K extends keyof PolyChatEvents>(
+    event: K,
+    listener: PolyChatEvents[K]
+  ): this {
+    return super.off(event, listener);
   }
 }

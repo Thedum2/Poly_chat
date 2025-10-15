@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
-import { ChzzkAdapter, SoopAdapter, YouTubeAdapter, ChatMessage } from 'polychat-bridge';
+import { ChzzkAdapter, SoopAdapter, YouTubeAdapter, ChatMessage, PolyChat } from 'polychat-bridge';
 
 type Platform = 'chzzk' | 'soop' | 'youtube';
 
@@ -34,6 +34,65 @@ function App() {
   const [adapters, setAdapters] = useState<Map<Platform, AdapterState>>(new Map());
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [isConfigured, setIsConfigured] = useState(false);
+  const [polyChat] = useState<PolyChat>(() => new PolyChat());
+
+  // Set up PolyChat event listeners
+  useEffect(() => {
+    const handleMessage = ({ platform, message }: { platform: string; message: ChatMessage }) => {
+      console.log(`[${platform.toUpperCase()}] Message received:`, message);
+      const isSystemMessage = message.nickname === 'SYSTEM';
+      setMessages((prev) => [...prev, {
+        platform: platform as Platform,
+        type: isSystemMessage ? 'system' : 'chat',
+        nickname: message.nickname,
+        content: message.content,
+        timestamp: message.timestamp,
+        chat_id: message.chat_id,
+      }]);
+    };
+
+    const handleError = ({ platform, error }: { platform: string; error: Error }) => {
+      console.log(`[${platform.toUpperCase()}] Error:`, error);
+      updateAdapterState(platform as Platform, { error: error.message });
+      addSystemMessage(platform as Platform, `❌ 오류 발생: ${error.message}`);
+    };
+
+    const handleConnected = ({ platform }: { platform: string }) => {
+      console.log(`[${platform.toUpperCase()}] Connected`);
+      updateAdapterState(platform as Platform, { status: 'connected' });
+      addSystemMessage(platform as Platform, '✅ 채팅 서버에 연결되었습니다');
+    };
+
+    const handleDisconnected = ({ platform }: { platform: string }) => {
+      console.log(`[${platform.toUpperCase()}] Disconnected`);
+      updateAdapterState(platform as Platform, { status: 'disconnected' });
+      addSystemMessage(platform as Platform, '⚠️ 채팅 서버 연결이 해제되었습니다');
+    };
+
+    const handleAuth = ({ platform, isAuthenticated }: { platform: string; isAuthenticated: boolean }) => {
+      console.log(`[${platform.toUpperCase()}] Auth:`, isAuthenticated);
+      updateAdapterState(platform as Platform, { status: isAuthenticated ? 'authenticated' : 'disconnected' });
+      if (isAuthenticated) {
+        addSystemMessage(platform as Platform, '🔑 인증에 성공했습니다');
+      } else {
+        addSystemMessage(platform as Platform, '❌ 인증에 실패했습니다');
+      }
+    };
+
+    polyChat.on('message', handleMessage);
+    polyChat.on('error', handleError);
+    polyChat.on('connected', handleConnected);
+    polyChat.on('disconnected', handleDisconnected);
+    polyChat.on('auth', handleAuth);
+
+    return () => {
+      polyChat.off('message', handleMessage);
+      polyChat.off('error', handleError);
+      polyChat.off('connected', handleConnected);
+      polyChat.off('disconnected', handleDisconnected);
+      polyChat.off('auth', handleAuth);
+    };
+  }, [polyChat]);
 
   const addSystemMessage = (platform: Platform, content: string) => {
     setMessages((prev) => [...prev, {
@@ -108,48 +167,8 @@ function App() {
         adapter = new YouTubeAdapter();
       }
 
-      // Set up event listeners
-      adapter.on('message', (message: ChatMessage) => {
-        console.log(`[${platform.toUpperCase()}] Message received:`, message);
-        // SYSTEM 닉네임을 가진 메시지는 시스템 메시지로 표시
-        const isSystemMessage = message.nickname === 'SYSTEM';
-        setMessages((prev) => [...prev, {
-          platform,
-          type: isSystemMessage ? 'system' : 'chat',
-          nickname: message.nickname,
-          content: message.content,
-          timestamp: message.timestamp,
-          chat_id: message.chat_id,
-        }]);
-      });
-
-      adapter.on('error', (err: Error) => {
-        console.log(`[${platform.toUpperCase()}] Error:`, err);
-        updateAdapterState(platform, { error: err.message });
-        addSystemMessage(platform, `❌ 오류 발생: ${err.message}`);
-      });
-
-      adapter.on('connected', () => {
-        console.log(`[${platform.toUpperCase()}] Connected`);
-        updateAdapterState(platform, { status: 'connected' });
-        addSystemMessage(platform, '✅ 채팅 서버에 연결되었습니다');
-      });
-
-      adapter.on('disconnected', () => {
-        console.log(`[${platform.toUpperCase()}] Disconnected`);
-        updateAdapterState(platform, { status: 'disconnected' });
-        addSystemMessage(platform, '⚠️ 채팅 서버 연결이 해제되었습니다');
-      });
-
-      adapter.on('auth', (isAuth: boolean) => {
-        console.log(`[${platform.toUpperCase()}] Auth:`, isAuth);
-        updateAdapterState(platform, { status: isAuth ? 'authenticated' : 'disconnected' });
-        if (isAuth) {
-          addSystemMessage(platform, '🔑 인증에 성공했습니다');
-        } else {
-          addSystemMessage(platform, '❌ 인증에 실패했습니다');
-        }
-      });
+      // Register adapter with PolyChat
+      polyChat.registerAdapter(adapter);
 
       // Initialize - init now handles code internally
       if (platform === 'chzzk') {
