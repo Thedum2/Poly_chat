@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { IChatAdapter } from './ports/IChatAdapter';
 import { ChatMessage } from './models/ChatMessage';
+import { createLogger } from './utils/logger';
 
 export interface PolyChatEvents {
   message: (data: { platform: string; message: ChatMessage }) => void;
@@ -8,10 +9,12 @@ export interface PolyChatEvents {
   connected: (data: { platform: string }) => void;
   auth: (data: { platform: string; isAuthenticated: boolean }) => void;
   disconnected: (data: { platform: string }) => void;
+  initialized: (data: { platform: string }) => void;
 }
 
 export class PolyChat extends EventEmitter {
   private readonly adapters: Map<string, IChatAdapter> = new Map();
+  private logger = createLogger('[PolyChat]');
 
   constructor() {
     super();
@@ -19,12 +22,12 @@ export class PolyChat extends EventEmitter {
 
   public registerAdapter(adapter: IChatAdapter): void {
     if (this.adapters.has(adapter.platform)) {
-      console.warn(`Adapter for platform '${adapter.platform}' is already registered.`);
+      this.logger.warn(`Adapter for platform '${adapter.platform}' is already registered`);
       return;
     }
     this.adapters.set(adapter.platform, adapter);
     this.listenToAdapterEvents(adapter);
-    console.log(`Adapter for ${adapter.platform} registered.`);
+    this.logger.info(`Adapter for ${adapter.platform} registered`);
   }
 
   private listenToAdapterEvents(adapter: IChatAdapter): void {
@@ -46,6 +49,10 @@ export class PolyChat extends EventEmitter {
 
     adapter.on('disconnected', () => {
       this.emit('disconnected', { platform: adapter.platform });
+    });
+
+    adapter.on('initialized', () => {
+      this.emit('initialized', { platform: adapter.platform });
     });
   }
 

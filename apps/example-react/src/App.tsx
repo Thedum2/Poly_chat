@@ -6,7 +6,7 @@ type Platform = 'chzzk' | 'soop' | 'youtube';
 
 interface PlatformConfig {
   clientId: string;
-  clientSecret: string;
+  clientSecret?: string;
   redirectUri?: string;
   pollingIntervalSeconds?: number;
 }
@@ -79,11 +79,17 @@ function App() {
       }
     };
 
+    const handleInitialized = ({ platform }: { platform: string }) => {
+      console.log(`[${platform.toUpperCase()}] Initialized`);
+      addSystemMessage(platform as Platform, '🚀 초기화가 완료되었습니다');
+    };
+
     polyChat.on('message', handleMessage);
     polyChat.on('error', handleError);
     polyChat.on('connected', handleConnected);
     polyChat.on('disconnected', handleDisconnected);
     polyChat.on('auth', handleAuth);
+    polyChat.on('initialized', handleInitialized);
 
     return () => {
       polyChat.off('message', handleMessage);
@@ -91,6 +97,7 @@ function App() {
       polyChat.off('connected', handleConnected);
       polyChat.off('disconnected', handleDisconnected);
       polyChat.off('auth', handleAuth);
+      polyChat.off('initialized', handleInitialized);
     };
   }, [polyChat]);
 
@@ -117,7 +124,6 @@ function App() {
     },
     youtube: {
       clientId: import.meta.env.VITE_YOUTUBE_CLIENT_ID || '',
-      clientSecret: import.meta.env.VITE_YOUTUBE_CLIENT_SECRET || '',
       redirectUri: 'http://localhost:3000/callback',
       pollingIntervalSeconds: 5, // 기본값 5초
     },
@@ -178,7 +184,7 @@ function App() {
         }
         await (adapter as ChzzkAdapter).init({
           clientId: config.clientId,
-          clientSecret: config.clientSecret,
+          clientSecret: config.clientSecret || '',
           redirectUri: config.redirectUri,
         });
       } else if (platform === 'youtube') {
@@ -188,7 +194,6 @@ function App() {
         }
         await (adapter as YouTubeAdapter).init({
           clientId: config.clientId,
-          clientSecret: config.clientSecret,
           redirectUri: config.redirectUri,
           pollingIntervalSeconds: config.pollingIntervalSeconds,
         });
@@ -196,7 +201,7 @@ function App() {
         // SOOP doesn't require redirectUri
         await (adapter as SoopAdapter).init({
           clientId: config.clientId,
-          clientSecret: config.clientSecret,
+          clientSecret: config.clientSecret || '',
         });
       }
 
@@ -225,14 +230,14 @@ function App() {
       if (platform === 'chzzk') {
         await (adapterState.adapter as ChzzkAdapter).authenticate({
           clientId: config.clientId,
-          clientSecret: config.clientSecret,
+          clientSecret: config.clientSecret || '',
           redirectUri: config.redirectUri || '',
           state: '', // adapter internal state will be used
         });
       } else if (platform === 'soop') {
         await (adapterState.adapter as SoopAdapter).authenticate({
           clientId: config.clientId,
-          clientSecret: config.clientSecret,
+          clientSecret: config.clientSecret || '',
         });
       } else if (platform === 'youtube') {
         await (adapterState.adapter as YouTubeAdapter).authenticate({});
@@ -344,15 +349,17 @@ function App() {
                         placeholder="Client ID 입력"
                       />
                     </div>
-                    <div className="form-field">
-                      <label>Client Secret</label>
-                      <input
-                        type="password"
-                        value={configs[platform].clientSecret}
-                        onChange={(e) => updateConfig(platform, 'clientSecret', e.target.value)}
-                        placeholder="Client Secret 입력"
-                      />
-                    </div>
+                    {(platform === 'chzzk' || platform === 'soop') && (
+                      <div className="form-field">
+                        <label>Client Secret</label>
+                        <input
+                          type="password"
+                          value={configs[platform].clientSecret}
+                          onChange={(e) => updateConfig(platform, 'clientSecret', e.target.value)}
+                          placeholder="Client Secret 입력"
+                        />
+                      </div>
+                    )}
                     {(platform === 'chzzk' || platform === 'youtube') && (
                       <div className="form-field">
                         <label>Redirect URI</label>

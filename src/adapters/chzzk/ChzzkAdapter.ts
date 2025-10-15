@@ -11,6 +11,7 @@ import {ConnectedMessageBody, SYSTEM_MESSAGE_TYPE} from '../../api/model/chzzk/c
 import {PLATFORM_NAME} from '../../api/config';
 import {ChatMessage} from '../../models/ChatMessage';
 import {v4 as uuidv4} from 'uuid';
+import {createLogger} from '../../utils/logger';
 
 export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
     readonly platform = 'chzzk';
@@ -22,6 +23,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
     private redirectUri: string = '';
     private authPopup: Window | null = null;
     private state: string = '';
+    private logger = createLogger('[CHZZK]');
 
     private opts: SocketClientOptions = {
         url: '',
@@ -57,10 +59,11 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
 
         try {
             this.code = await this.openAuthPopup();
-            console.log('[CHZZK] OAuth code received:');
+            this.logger.info('OAuth code received');
+            this.emit('initialized');
             return;
         } catch (error) {
-            console.error('[CHZZK] OAuth popup failed:', error);
+            this.logger.error('OAuth popup failed:', error);
             this.emit('error', error);
             throw error;
         }
@@ -109,7 +112,6 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                             if (this.authPopup && !this.authPopup.closed) {
                                 this.authPopup.close();
                             }
-                            console.log('[CHZZK] OAuth code received from URL:', code);
                             resolve(code);
                         }
                     }
@@ -159,10 +161,10 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
             });
 
             this._isAuthenticated = true;
-            this.emit('auth', true);
-            console.log('ChzzkAdapter authenticated successfully.');
+            this.emit('auth', this._isAuthenticated);
+            this.logger.info('Authenticated successfully');
         } catch (error: any) {
-            console.error('ChzzkAdapter authentication failed:', error);
+            this.logger.error('Authentication failed:', error);
             this._isAuthenticated = false;
             this.emit('auth', false);
             this.emit('error', error);
@@ -196,22 +198,22 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
 
                         this._isConnected = true;
                         this.emit('connected');
-                        if (this.opts.debug) console.log('[CHZZK] connected & subscribed');
+                        this.logger.debug('Connected and subscribed');
                         break;
                     }
                     case SYSTEM_MESSAGE_TYPE.SUBSCRIBED:
-                        if (this.opts.debug) console.log('[CHZZK] subscribed');
+                        this.logger.debug('Subscribed');
                         break;
                     case SYSTEM_MESSAGE_TYPE.UNSUBSCRIBED:
-                        if (this.opts.debug) console.log('[CHZZK] unsubscribed');
+                        this.logger.debug('Unsubscribed');
                         break;
                     case SYSTEM_MESSAGE_TYPE.REVOKED:
-                        console.warn('[CHZZK] token/session revoked');
+                        this.logger.warn('Token/session revoked');
                         this.emit('error', new Error('Session revoked'));
                         break;
                     case SYSTEM_MESSAGE_TYPE.UNKNOWN:
                     default:
-                        if (this.opts.debug) console.log('[CHZZK] system: unknown', result);
+                        this.logger.debug('System message: unknown', result);
                         break;
                 }
             });
@@ -221,7 +223,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
 
                 const msg: ChatMessage = {
                     platform: PLATFORM_NAME.CHZZK,
-                    chat_id: String((chatEvent as any)?.messageId ?? 0),
+                    chat_id: 'unknown', // TODO 1.1.0: Implement unique chat message ID tracking
                     nickname: chatEvent.profile?.nickname ?? 'unknown',
                     content: chatEvent.content ?? '',
                     timestamp: new Date((chatEvent as any)?.timestamp ?? Date.now()),
@@ -232,17 +234,17 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
 
             socket.on('DONATION', (raw: string) => {
                 const donation = chzzkMessageHandler.handleDonationMessage(raw);
-                if (this.opts.debug) console.log('[CHZZK] donation:', donation);
+                this.logger.debug('Donation received:', donation);
                 this.emit('donation', donation);
             });
 
             socket.on('SUBSCRIPTION', (raw: string) => {
                 const sub = chzzkMessageHandler.handleSubscriptionMessage(raw);
-                if (this.opts.debug) console.log('[CHZZK] subscription:', sub);
+                this.logger.debug('Subscription received:', sub);
                 this.emit('subscription', sub);
             });
         } catch (error) {
-            console.error('Failed to connect to Chzzk:', error);
+            this.logger.error('Connection failed:', error);
             this.emit('error', error);
             throw error;
         }
@@ -254,7 +256,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         } finally {
             this._isConnected = false;
             this.emit('disconnected');
-            console.log('ChzzkAdapter disconnected.');
+            this.logger.info('Disconnected');
         }
     }
 
@@ -263,7 +265,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         chzzkAuthStore.getState().clearTokens();
         this._isAuthenticated = false;
         this.emit('auth', false);
-        console.log('ChzzkAdapter logged out.');
+        this.logger.info('Logged out');
     }
 
 
@@ -277,7 +279,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         if (!sessionKey) return;
 
         await chzzkSessionApi.subscribeToChat({sessionKey});
-        if (this.opts.debug) console.log('Subscribed to Chzzk chat');
+        this.logger.debug('Subscribed to chat');
     }
 
     private async subscribeToDonation(): Promise<void> {
@@ -285,7 +287,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         if (!sessionKey) return;
 
         await chzzkSessionApi.subscribeToDonation({sessionKey});
-        if (this.opts.debug) console.log('Subscribed to Chzzk donation');
+        this.logger.debug('Subscribed to donation');
     }
 
     private async subscribeToSubscription(): Promise<void> {
@@ -293,6 +295,6 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         if (!sessionKey) return;
 
         await chzzkSessionApi.subscribeToSubscription({sessionKey});
-        if (this.opts.debug) console.log('Subscribed to Chzzk subscription');
+        this.logger.debug('Subscribed to subscription');
     }
 }

@@ -15,20 +15,7 @@ export function socket({
                            debug,
                            timeout
                        }: SocketClientOptions) {
-    console.log(`[socket] Connecting to url: "${url}" with options:`, { transports, forceNew, timeout });
     const s = io(url, { transports, forceNew, timeout});
-
-    if (debug) {
-        s.on("connect", () => console.log("[sio] connect:", s.id));
-        s.on("disconnect", (r: string) => console.log("[sio] disconnect:", r));
-        s.on("connect_error", (e: any) =>
-            console.log("[sio] connect_error:", e?.message || e)
-        );
-        s.on("reconnect_attempt", (n: number) =>
-            console.log("[sio] reconnect_attempt:", n)
-        );
-        s.on("reconnect", (n: number) => console.log("[sio] reconnect:", n));
-    }
 
     let originalOnevent: any | null = null;
     const enableOnAny = (cb: (event: string, ...args: any[]) => void) => {

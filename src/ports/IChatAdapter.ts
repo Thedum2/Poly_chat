@@ -16,4 +16,5 @@ export interface IChatAdapter {
   on(event: 'connected', listener: () => void): this;
   on(event: 'auth', listener: (isAuthenticated: boolean) => void): this;
   on(event: 'disconnected', listener: () => void): this;
+  on(event: 'initialized', listener: () => void): this;
 }

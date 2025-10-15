@@ -8,11 +8,14 @@ import {
     SYSTEM_MESSAGE_TYPE,
     UnsubscribedMessageBody
 } from "../../api/model/chzzk/chzzkMessage";
+import {createLogger} from '../../utils/logger';
+
+const logger = createLogger('[CHZZK:MessageHandler]');
 
 export const chzzkMessageHandler = {
     handleSystemMessage: (data: string): any => {
         try {
-            console.log('📩 SYSTEM :', data);
+            logger.debug('SYSTEM message received', data);
             const parsedData = JSON.parse(data);
             switch (parsedData.type) {
                 case SYSTEM_MESSAGE_TYPE.CONNECTED:
@@ -27,34 +30,34 @@ export const chzzkMessageHandler = {
                     return { type: SYSTEM_MESSAGE_TYPE.UNKNOWN, rawData: data };
             }
         } catch (error) {
-            console.error('Error parsing system message:', error);
+            logger.error('Error parsing system message:', error);
             return { type: 'unknown', rawData: data };
         }
     },
     handleChatMessage: (data: string): ChatEventMessage => {
         try {
-            console.log('💬 CHAT', data);
+            logger.debug('CHAT message received', data);
             return JSON.parse(data) as ChatEventMessage;
         } catch (error) {
-            console.error('Error parsing chat message:', error);
+            logger.error('Error parsing chat message:', error);
             throw error;
         }
     },
     handleDonationMessage: (data: string): DonationEventMessage => {
         try {
-            console.log('💰 DONATION', data);
+            logger.debug('DONATION message received', data);
             return JSON.parse(data) as DonationEventMessage;
         } catch (error) {
-            console.error('Error parsing donation message:', error);
+            logger.error('Error parsing donation message:', error);
             throw error;
         }
     },
     handleSubscriptionMessage: (data: string): SubscriptionEventMessage => {
         try {
-            console.log('⭐ SUBSCRIPTION', data);
+            logger.debug('SUBSCRIPTION message received', data);
             return JSON.parse(data) as SubscriptionEventMessage;
         } catch (error) {
-            console.error('Error parsing subscription message:', error);
+            logger.error('Error parsing subscription message:', error);
             throw error;
         }
     },

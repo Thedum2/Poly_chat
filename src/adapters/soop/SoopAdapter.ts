@@ -6,6 +6,7 @@ import { soopAuthStore } from '../../store/soopAuthStore';
 import {ISoopChatSDK, ISoopChatSDKConstructor} from "../../api/model/soop/sdk";
 import {SOOP_ACTION, SoopAction, SoopMessage} from "../../api/model/soop/soopMessage";
 import {buildSoopAuthUrl} from "../../api/modules/soop/auth";
+import {createLogger} from '../../utils/logger';
 
 declare global {
     interface Window {
@@ -21,6 +22,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
     private clientId: string = '';
     private code: string = '';
     private authPopup: Window | null = null;
+    private logger = createLogger('[SOOP]');
 
     get isAuthenticated(): boolean {
         return this._isAuthenticated;
@@ -32,7 +34,6 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
 
     async init(options: SoopInitOptions): Promise<void> {
         if (typeof window === 'undefined' || typeof document === 'undefined') {
-            // SSR/Node 환경에서는 skip
             throw new Error('SOOP adapter requires browser environment');
         }
 
@@ -53,7 +54,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
             };
 
             script.onerror = (err) => {
-                console.error('[SOOP] Failed to load Chat SDK script.', err);
+                this.logger.error('Failed to load Chat SDK script:', err);
                 reject(new Error('Failed to load Soop Chat SDK'));
             };
 
@@ -62,16 +63,17 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
 
         try {
             this.code = await this.openAuthPopup();
-            console.log('[SOOP] OAuth code received:');
+            this.logger.info('OAuth code received');
+            this.emit('initialized');
         } catch (error) {
-            console.error('[SOOP] OAuth popup failed:', error);
+            this.logger.error('OAuth popup failed:', error);
             this.emit('error', error);
             throw error;
         }
     }
 
     private initializeChatSDK(options: SoopInitOptions): void {
-        console.log('[SOOP] Chat SDK script loaded.');
+        this.logger.debug('Chat SDK script loaded');
 
         if (!window.SOOP) {
             throw new Error('SOOP Chat SDK not found on window.SOOP');
@@ -80,7 +82,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         const ChatSDKConstructor = this.findChatSDKConstructor();
         this.chatSDK = new ChatSDKConstructor(options.clientId, options.clientSecret);
         this.clientId = options.clientId;
-        console.log('[SOOP] ChatSDK instance created.');
+        this.logger.debug('ChatSDK instance created');
     }
 
     private openAuthPopup(): Promise<string> {
@@ -121,7 +123,6 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
                             if (this.authPopup && !this.authPopup.closed) {
                                 this.authPopup.close();
                             }
-                            console.log('[SOOP] OAuth code received from URL:', code);
                             resolve(code);
                         }
                     }
@@ -148,7 +149,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
     }
 
     private findChatSDKConstructor(): ISoopChatSDKConstructor {
-        console.log('[SOOP] SOOP is an object. Keys:', Object.keys(window.SOOP!));
+        this.logger.debug('SOOP window keys:', Object.keys(window.SOOP!));
 
         const possibleConstructors = [
             (window.SOOP as any).ChatSDK,
@@ -159,7 +160,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
 
         for (const constructor of possibleConstructors) {
             if (typeof constructor === 'function') {
-                console.log('[SOOP] Found constructor:', constructor.name || 'anonymous');
+                this.logger.debug('Found constructor:', constructor.name || 'anonymous');
                 return constructor;
             }
         }
@@ -167,9 +168,6 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         throw new Error(`SOOP ChatSDK constructor not found. Keys: ${Object.keys(window.SOOP!).join(', ')}`);
     }
 
-    /**
-     * authCode로 토큰 발급 및 setAuth까지 진행 (init()이 먼저 호출되어 있어야 함)
-     */
     async authenticate(options: SoopAuthOptions): Promise<void> {
         try {
             if (!this.chatSDK) {
@@ -184,18 +182,17 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
             this.chatSDK.setAuth(tokens.access_token);
 
             this._isAuthenticated = true;
-            console.log('[SOOP] Authenticated and setAuth completed.');
+            this.emit('auth', this._isAuthenticated);
+            this.logger.info('Authenticated successfully');
         } catch (error: any) {
-            console.error('[SOOP] Authentication failed:', error);
+            this.logger.error('Authentication failed:', error);
             this._isAuthenticated = false;
+            this.emit('auth', false);
             this.emit('error', error);
             throw error;
         }
     }
 
-    /**
-     * 연결 + 이벤트 바인딩
-     */
     async connect(): Promise<void> {
         try {
             if (!this._isAuthenticated) {
@@ -208,10 +205,10 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
             await this.chatSDK.connect();
             this._isConnected = true;
             this.emit('connected');
-            console.log('[SOOP] connected.');
+            this.logger.info('Connected');
 
             this.chatSDK.handleMessageReceived((action: SoopAction, message: SoopMessage) => {
-                console.log('[SOOP] Received action:', action, message);
+                this.logger.debug('Message received:', action, message);
 
                 const parsed = this.parseSoopEvent(action, message);
                 if (parsed) {
@@ -222,16 +219,16 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
             this.chatSDK.handleChatClosed(() => {
                 this._isConnected = false;
                 this.emit('disconnected');
-                console.log('[SOOP] disconnected: chat closed.');
+                this.logger.info('Chat closed');
             });
 
             this.chatSDK.handleError((code: string, message: string) => {
-                const err = new Error(`Soop SDK Error: ${code} - ${message}`);
-                console.error(err.message);
+                const err = new Error(`SDK Error: ${code} - ${message}`);
+                this.logger.error(err.message);
                 this.emit('error', err);
             });
         } catch (error: any) {
-            console.error('[SOOP] connection failed:', error);
+            this.logger.error('Connection failed:', error);
             this._isConnected = false;
             this.emit('error', error);
             throw error;
@@ -246,7 +243,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         } finally {
             this._isConnected = false;
             this.emit('disconnected');
-            console.log('[SOOP] disconnected.');
+            this.logger.info('Disconnected');
         }
     }
 
@@ -254,14 +251,14 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         await this.disconnect();
         soopAuthStore.getState().clearTokens();
         this._isAuthenticated = false;
-        console.log('[SOOP] logged out.');
+        this.logger.info('Logged out');
     }
 
     private parseSoopEvent(action: SoopAction, soopMsg: any): ChatMessage | null {
         if (action === SOOP_ACTION.MESSAGE) {
             return {
                 platform: this.platform,
-                chat_id: 'unknown',
+                chat_id: 'unknown', // TODO 1.1.0: Implement unique chat message ID tracking
                 nickname: soopMsg.userNickname || 'Unknown',
                 content: soopMsg.message || '',
                 timestamp: new Date(),
@@ -271,7 +268,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         if (action === SOOP_ACTION.MANAGER_MESSAGE) {
             return {
                 platform: this.platform,
-                chat_id: 'unknown',
+                chat_id: 'unknown', // TODO 1.1.0: Implement unique chat message ID tracking
                 nickname: soopMsg.userNickname || 'Unknown',
                 content: soopMsg.message || '',
                 timestamp: new Date(),

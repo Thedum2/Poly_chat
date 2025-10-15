@@ -8,20 +8,21 @@ import {youtubeLiveChatApi} from '../../api/modules/youtube/liveChat';
 import {ChatMessage} from '../../models/ChatMessage';
 import {PLATFORM_NAME} from '../../api/config';
 import {v4 as uuidv4} from 'uuid';
+import {createLogger} from '../../utils/logger';
 
 export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
     readonly platform = 'youtube';
     private _isAuthenticated = false;
     private _isConnected = false;
     private clientId: string = '';
-    private clientSecret: string = '';
     private redirectUri: string = '';
     private authPopup: Window | null = null;
     private state: string = '';
     private liveChatId: string | null = null;
     private pollingInterval: NodeJS.Timeout | null = null;
     private nextPageToken: string | null = null;
-    private pollingIntervalMs: number = 5000; // 기본값 5초
+    private pollingIntervalMs: number = 5000;
+    private logger = createLogger('[YouTube]');
 
     get isAuthenticated(): boolean {
         return this._isAuthenticated;
@@ -40,7 +41,6 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
         this._isConnected = false;
 
         this.clientId = options.clientId;
-        this.clientSecret = options.clientSecret;
         this.redirectUri = options.redirectUri;
 
         if (options.pollingIntervalSeconds !== undefined) {
@@ -52,9 +52,10 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
 
         try {
             await this.openAuthPopup();
-            console.log('[YouTube] OAuth popup completed, access token stored');
+            this.logger.info('OAuth popup completed');
+            this.emit('initialized');
         } catch (error) {
-            console.error('[YouTube] OAuth popup failed:', error);
+            this.logger.error('OAuth popup failed:', error);
             this.emit('error', error);
             throw error;
         }
@@ -68,7 +69,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
                 redirectUri: this.redirectUri,
                 state: this.state,
             });
-            console.log('[YouTube] Opening OAuth popup:', authUrl);
+            this.logger.debug('Opening OAuth popup');
 
             this.authPopup = window.open(
                 authUrl,
@@ -118,8 +119,6 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
                             if (this.authPopup && !this.authPopup.closed) {
                                 this.authPopup.close();
                             }
-                            console.log('[YouTube] Access token:', accessToken);
-
 
                             youtubeAuthStore.getState().setTokens({
                                 accessToken: accessToken,
@@ -152,7 +151,6 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
 
     async authenticate(options: YouTubeAuthOptions): Promise<void> {
         try {
-
             const accessToken = youtubeAuthStore.getState().accessToken;
 
             if (!accessToken) {
@@ -160,10 +158,10 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
             }
 
             this._isAuthenticated = true;
-            console.log('[YouTube] Authenticated successfully.');
+            this.logger.info('Authenticated successfully');
             this.emit('auth', true);
         } catch (error: any) {
-            console.error('[YouTube] Authentication failed:', error);
+            this.logger.error('Authentication failed:', error);
             this._isAuthenticated = false;
             this.emit('auth', false);
             this.emit('error', error);
@@ -188,25 +186,21 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
                 throw new Error('활성 방송을 찾을 수 없습니다. 라이브 스트리밍을 시작한 후 다시 시도해주세요.');
             }
 
-            if (broadcastsResponse.items.length > 1) {
-                throw new Error(`진행 중인 방송이 ${broadcastsResponse.items.length}개 있습니다. 방송은 1개만 지원합니다.`);
-            }
-
             this.liveChatId = broadcastsResponse.items[0].snippet.liveChatId || null;
 
             if (!this.liveChatId) {
                 throw new Error('라이브 채팅이 활성화되지 않았습니다.');
             }
 
-            console.log('[YouTube] Live chat ID found:', this.liveChatId);
+            this.logger.debug('Live chat ID found');
 
             this._isConnected = true;
             this.emit('connected');
             await this.startPolling();
 
-            console.log('[YouTube] Connected and polling started.');
+            this.logger.info('Connected and polling started');
         } catch (error: any) {
-            console.error('[YouTube] Connection failed:', error);
+            this.logger.error('Connection failed:', error);
             this._isConnected = false;
             this.emit('error', error);
             throw error;
@@ -234,7 +228,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
                     if (item.snippet.type === 'textMessageEvent' && item.snippet.textMessageDetails) {
                         const msg: ChatMessage = {
                             platform: PLATFORM_NAME.YOUTUBE,
-                            chat_id: item.id,
+                            chat_id: 'unknown', // TODO 1.1.0: Implement unique chat message ID tracking
                             nickname: item.authorDetails?.displayName || 'Unknown',
                             content: item.snippet.textMessageDetails.messageText,
                             timestamp: new Date(item.snippet.publishedAt),
@@ -245,13 +239,11 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
 
                 this.nextPageToken = response.nextPageToken || null;
 
-                // Use configured polling interval, fallback to API response or default
                 const pollingInterval = this.pollingIntervalMs;
                 this.pollingInterval = setTimeout(poll, pollingInterval);
             } catch (error) {
-                console.error('[YouTube] Polling error:', error);
+                this.logger.error('Polling error:', error);
                 this.emit('error', error);
-                // Retry with configured polling interval
                 this.pollingInterval = setTimeout(poll, this.pollingIntervalMs);
             }
         };
@@ -273,7 +265,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
         } finally {
             this._isConnected = false;
             this.emit('disconnected');
-            console.log('[YouTube] Disconnected.');
+            this.logger.info('Disconnected');
         }
     }
 
@@ -282,6 +274,6 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
         youtubeAuthStore.getState().clearTokens();
         this._isAuthenticated = false;
         this.emit('auth', false);
-        console.log('[YouTube] Logged out.');
+        this.logger.info('Logged out');
     }
 }
