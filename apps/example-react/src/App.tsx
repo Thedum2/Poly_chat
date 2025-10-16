@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { ChzzkAdapter, SoopAdapter, YouTubeAdapter, ChatMessage, PolyChat } from 'polychat-bridge';
 
@@ -35,6 +35,69 @@ function App() {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [isConfigured, setIsConfigured] = useState(false);
   const [polyChat] = useState<PolyChat>(() => new PolyChat());
+  const chatMessagesRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isTestMode, setIsTestMode] = useState(false);
+  const testModeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    // Use scrollIntoView for more reliable scrolling
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Test mode: Simulate incoming messages
+  useEffect(() => {
+    if (isTestMode) {
+      const platforms: Platform[] = ['chzzk', 'soop', 'youtube'];
+      const usernames = ['테스트유저1', '테스트유저2', '테스트유저3', '뷰어123', '시청자A', '팬B'];
+      const messageContents = [
+        '안녕하세요!',
+        'ㅋㅋㅋㅋㅋㅋ',
+        '오늘 방송 재밌네요',
+        '구독했습니다!',
+        '이거 어떻게 하는 거예요?',
+        '대박 ㄷㄷㄷ',
+        '감사합니다',
+        '좋아요 눌렀어요',
+        '첫 방문이에요',
+        '방송 화이팅!',
+      ];
+
+      const generateRandomMessage = () => {
+        const platform = platforms[Math.floor(Math.random() * platforms.length)];
+        const username = usernames[Math.floor(Math.random() * usernames.length)];
+        const content = messageContents[Math.floor(Math.random() * messageContents.length)];
+
+        setMessages((prev) => [...prev, {
+          platform,
+          type: 'chat',
+          nickname: username,
+          content,
+          timestamp: new Date(),
+          chat_id: 'test-' + Math.random().toString(36).substring(7),
+        }]);
+      };
+
+      // Generate messages at random intervals (500ms ~ 2000ms)
+      const scheduleNextMessage = () => {
+        const delay = Math.random() * 500
+        testModeIntervalRef.current = setTimeout(() => {
+          generateRandomMessage();
+          scheduleNextMessage();
+        }, delay);
+      };
+
+      scheduleNextMessage();
+
+      return () => {
+        if (testModeIntervalRef.current) {
+          clearTimeout(testModeIntervalRef.current);
+          testModeIntervalRef.current = null;
+        }
+      };
+    }
+  }, [isTestMode]);
 
   // Set up PolyChat event listeners
   useEffect(() => {
@@ -417,9 +480,17 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>PolyChat</h1>
-        <button className="btn-reset" onClick={handleReset}>
-          재설정
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            className={`btn-reset ${isTestMode ? 'btn-disconnect' : ''}`}
+            onClick={() => setIsTestMode(!isTestMode)}
+          >
+            {isTestMode ? '테스트 중지' : '테스트 모드'}
+          </button>
+          <button className="btn-reset" onClick={handleReset}>
+            재설정
+          </button>
+        </div>
       </header>
 
       <div className="main-container">
@@ -495,33 +566,36 @@ function App() {
             <span className="message-count">{messages.length} 메시지</span>
           </div>
 
-          <div className="chat-messages">
+          <div className="chat-messages" ref={chatMessagesRef}>
             {messages.length === 0 ? (
               <div className="empty-state">
                 채팅 메시지가 없습니다
               </div>
             ) : (
-              messages.map((msg, idx) => (
-                <div key={idx} className={`chat-message ${msg.type === 'system' ? 'system-message' : ''}`}>
-                  <span
-                    className="platform-badge"
-                    style={{ backgroundColor: getPlatformColor(msg.platform) }}
-                  >
-                    {getPlatformName(msg.platform)}
-                  </span>
-                  <div className="message-body">
-                    <div className="message-meta">
-                      <span className={`message-author ${msg.type === 'system' ? 'system-author' : ''}`}>
-                        {msg.nickname}
-                      </span>
-                      <span className="message-time">{msg.timestamp.toLocaleTimeString()}</span>
-                    </div>
-                    <div className={`message-text ${msg.type === 'system' ? 'system-text' : ''}`}>
-                      {msg.content}
+              <>
+                {messages.map((msg, idx) => (
+                  <div key={idx} className={`chat-message ${msg.type === 'system' ? 'system-message' : ''}`}>
+                    <span
+                      className="platform-badge"
+                      style={{ backgroundColor: getPlatformColor(msg.platform) }}
+                    >
+                      {getPlatformName(msg.platform)}
+                    </span>
+                    <div className="message-body">
+                      <div className="message-meta">
+                        <span className={`message-author ${msg.type === 'system' ? 'system-author' : ''}`}>
+                          {msg.nickname}
+                        </span>
+                        <span className="message-time">{msg.timestamp.toLocaleTimeString()}</span>
+                      </div>
+                      <div className={`message-text ${msg.type === 'system' ? 'system-text' : ''}`}>
+                        {msg.content}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                ))}
+                <div ref={messagesEndRef} />
+              </>
             )}
           </div>
         </div>
