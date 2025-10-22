@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
-import { ChzzkAdapter, SoopAdapter, YouTubeAdapter, ChatMessage, PolyChat } from 'polychat-bridge';
+import { ChzzkAdapter, SoopAdapter, YouTubeAdapter, ChatMessage, PolyChat, BroadcasterInfo } from 'polychat-bridge';
 
 type Platform = 'chzzk' | 'soop' | 'youtube';
 
@@ -16,6 +16,7 @@ interface AdapterState {
   status: 'disconnected' | 'initialized' | 'authenticated' | 'connected';
   error: string;
   config: PlatformConfig;
+  broadcasterInfo?: BroadcasterInfo | null;
 }
 
 type MessageType = 'chat' | 'system';
@@ -132,12 +133,19 @@ function App() {
       addSystemMessage(platform as Platform, '⚠️ 채팅 서버 연결이 해제되었습니다');
     };
 
-    const handleAuth = ({ platform, isAuthenticated }: { platform: string; isAuthenticated: boolean }) => {
-      console.log(`[${platform.toUpperCase()}] Auth:`, isAuthenticated);
-      updateAdapterState(platform as Platform, { status: isAuthenticated ? 'authenticated' : 'disconnected' });
-      if (isAuthenticated) {
-        addSystemMessage(platform as Platform, '🔑 인증에 성공했습니다');
+    const handleAuth = ({ platform, broadcasterInfo }: { platform: string; broadcasterInfo: BroadcasterInfo | null }) => {
+      console.log(`[${platform.toUpperCase()}] Auth:`, broadcasterInfo);
+      if (broadcasterInfo) {
+        updateAdapterState(platform as Platform, {
+          status: 'authenticated',
+          broadcasterInfo: broadcasterInfo
+        });
+        addSystemMessage(platform as Platform, `🔑 인증 성공: ${broadcasterInfo.nickname}`);
       } else {
+        updateAdapterState(platform as Platform, {
+          status: 'disconnected',
+          broadcasterInfo: null
+        });
         addSystemMessage(platform as Platform, '❌ 인증에 실패했습니다');
       }
     };
@@ -512,6 +520,45 @@ function App() {
                     {status === 'disconnected' && '○ 연결 안됨'}
                   </span>
                 </div>
+
+                {state?.broadcasterInfo && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.75rem',
+                    background: '#1a1a1a',
+                    borderRadius: '0.5rem',
+                    marginBottom: '0.75rem',
+                  }}>
+                    <img
+                      src={state.broadcasterInfo.profileImageUrl}
+                      alt={state.broadcasterInfo.nickname}
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        color: '#ffffff',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        marginBottom: '0.125rem',
+                      }}>
+                        {state.broadcasterInfo.nickname}
+                      </div>
+                      <div style={{
+                        color: '#888888',
+                        fontSize: '0.75rem',
+                      }}>
+                        방송인
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {error && (
                   <div className="error-message">⚠ {error}</div>

@@ -5,8 +5,9 @@ import { ChatMessage } from '../../models/ChatMessage';
 import { soopAuthStore } from '../../store/soopAuthStore';
 import {ISoopChatSDK, ISoopChatSDKConstructor} from "../../api/model/soop/sdk";
 import {SOOP_ACTION, SoopAction, SoopMessage} from "../../api/model/soop/soopMessage";
-import {buildSoopAuthUrl} from "../../api/modules/soop/auth";
 import {createLogger} from '../../utils/logger';
+import {buildSoopAuthUrl} from "../../api/modules/soop/auth";
+import {soopAuthApi} from "../../api/modules/soop/channel";
 
 declare global {
     interface Window {
@@ -181,13 +182,31 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
 
             this.chatSDK.setAuth(tokens.access_token);
 
-            this._isAuthenticated = true;
-            this.emit('auth', this._isAuthenticated);
-            this.logger.info('Authenticated successfully');
+            try {
+                const stationInfo = await soopAuthApi.getStationInfo();
+
+                if (stationInfo.result === 1 && stationInfo.data) {
+                    this._isAuthenticated = true;
+                    this.emit('auth', {
+                        nickname: stationInfo.data.station_name,
+                        profileImageUrl: stationInfo.data.profile_image
+                    });
+                    this.logger.info('Authenticated successfully with broadcaster info');
+                } else {
+                    this._isAuthenticated = true;
+                    this.emit('auth', null);
+                    this.logger.info('Authenticated successfully but no broadcaster info found');
+                }
+            } catch (error: any) {
+                this.logger.warn('Failed to get broadcaster info:', error);
+                this._isAuthenticated = true;
+                this.emit('auth', null);
+                this.logger.info('Authenticated successfully but failed to fetch broadcaster info');
+            }
         } catch (error: any) {
             this.logger.error('Authentication failed:', error);
             this._isAuthenticated = false;
-            this.emit('auth', false);
+            this.emit('auth', null);
             this.emit('error', error);
             throw error;
         }
@@ -251,6 +270,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         await this.disconnect();
         soopAuthStore.getState().clearTokens();
         this._isAuthenticated = false;
+        this.emit('auth', null);
         this.logger.info('Logged out');
     }
 

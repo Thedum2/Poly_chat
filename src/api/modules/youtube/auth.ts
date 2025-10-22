@@ -1,5 +1,6 @@
 import { YouTubeAuthCodeRequest } from "../../model/youtube/auth";
 import { youTubeScope } from "../../config";
+import { httpClient } from "../../httpClient";
 
 export const youtubeAuthApi = {
 
@@ -14,5 +15,4 @@ export const youtubeAuthApi = {
         });
         return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
     },
-
 };

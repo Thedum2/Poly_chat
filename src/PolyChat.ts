@@ -1,13 +1,13 @@
 import { EventEmitter } from 'events';
 import { IChatAdapter } from './ports/IChatAdapter';
-import { ChatMessage } from './models/ChatMessage';
+import { ChatMessage, BroadcasterInfo } from './models/ChatMessage';
 import { createLogger } from './utils/logger';
 
 export interface PolyChatEvents {
   message: (data: { platform: string; message: ChatMessage }) => void;
   error: (data: { platform: string; error: Error }) => void;
   connected: (data: { platform: string }) => void;
-  auth: (data: { platform: string; isAuthenticated: boolean }) => void;
+  auth: (data: { platform: string; broadcasterInfo: BroadcasterInfo | null }) => void;
   disconnected: (data: { platform: string }) => void;
   initialized: (data: { platform: string }) => void;
 }
@@ -43,8 +43,8 @@ export class PolyChat extends EventEmitter {
       this.emit('connected', { platform: adapter.platform });
     });
 
-    adapter.on('auth', (isAuthenticated: boolean) => {
-      this.emit('auth', { platform: adapter.platform, isAuthenticated });
+    adapter.on('auth', (broadcasterInfo: BroadcasterInfo | null) => {
+      this.emit('auth', { platform: adapter.platform, broadcasterInfo });
     });
 
     adapter.on('disconnected', () => {

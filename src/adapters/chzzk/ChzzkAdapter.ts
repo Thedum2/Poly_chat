@@ -12,6 +12,7 @@ import {PLATFORM_NAME} from '../../api/config';
 import {ChatMessage} from '../../models/ChatMessage';
 import {v4 as uuidv4} from 'uuid';
 import {createLogger} from '../../utils/logger';
+import {chzzkChannelApi} from "../../api/modules/chzzk/channel";
 
 export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
     readonly platform = 'chzzk';
@@ -160,13 +161,33 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                 refreshToken: tokens.content.refreshToken,
             });
 
-            this._isAuthenticated = true;
-            this.emit('auth', this._isAuthenticated);
-            this.logger.info('Authenticated successfully');
+            try {
+                const userInfo = await chzzkChannelApi.getUserInfo();
+                const channelInfo = await chzzkChannelApi.getChannelInfo(userInfo.content.channelId);
+
+                if (channelInfo.content.data.length > 0) {
+                    const channel = channelInfo.content.data[0];
+                    this._isAuthenticated = true;
+                    this.emit('auth', {
+                        nickname: channel.channelName,
+                        profileImageUrl: channel.channelImageUrl
+                    });
+                    this.logger.info('Authenticated successfully with broadcaster info');
+                } else {
+                    this._isAuthenticated = true;
+                    this.emit('auth', null);
+                    this.logger.info('Authenticated successfully but no broadcaster info found');
+                }
+            } catch (error: any) {
+                this.logger.warn('Failed to get broadcaster info:', error);
+                this._isAuthenticated = true;
+                this.emit('auth', null);
+                this.logger.info('Authenticated successfully but failed to fetch broadcaster info');
+            }
         } catch (error: any) {
             this.logger.error('Authentication failed:', error);
             this._isAuthenticated = false;
-            this.emit('auth', false);
+            this.emit('auth', null);
             this.emit('error', error);
             throw error;
         }
@@ -264,7 +285,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         await this.disconnect();
         chzzkAuthStore.getState().clearTokens();
         this._isAuthenticated = false;
-        this.emit('auth', false);
+        this.emit('auth', null);
         this.logger.info('Logged out');
     }
 

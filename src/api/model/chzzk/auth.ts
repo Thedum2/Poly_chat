@@ -63,3 +63,25 @@ export interface TokenRevokeResponse extends ResponseBase{
         scope: string;
     };
 }
+
+{/* 사용자 정보 조회 */}
+export interface UserInfoResponse extends ResponseBase {
+    content: {
+        channelId: string;
+        channelName: string;
+        nickname: string;
+    };
+}
+
+{/* 채널 정보 조회 */}
+export interface ChannelInfoResponse extends ResponseBase {
+    content: {
+        data: Array<{
+            channelId: string;
+            channelName: string;
+            channelImageUrl: string;
+            followerCount: number;
+            verifiedMark: boolean;
+        }>;
+    };
+}

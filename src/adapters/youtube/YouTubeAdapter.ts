@@ -9,6 +9,7 @@ import {ChatMessage} from '../../models/ChatMessage';
 import {PLATFORM_NAME} from '../../api/config';
 import {v4 as uuidv4} from 'uuid';
 import {createLogger} from '../../utils/logger';
+import {youtubeChannelApi} from "../../api/modules/youtube/channel";
 
 export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
     readonly platform = 'youtube';
@@ -157,13 +158,32 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
                 throw new Error('No access token found. Please run init() first.');
             }
 
-            this._isAuthenticated = true;
-            this.logger.info('Authenticated successfully');
-            this.emit('auth', true);
+            try {
+                const channelInfo = await youtubeChannelApi.getChannelInfo();
+
+                if (channelInfo.items && channelInfo.items.length > 0) {
+                    const channel = channelInfo.items[0];
+                    this._isAuthenticated = true;
+                    this.emit('auth', {
+                        nickname: channel.snippet.title,
+                        profileImageUrl: channel.snippet.thumbnails.high?.url || channel.snippet.thumbnails.medium?.url || channel.snippet.thumbnails.default?.url
+                    });
+                    this.logger.info('Authenticated successfully with broadcaster info');
+                } else {
+                    this._isAuthenticated = true;
+                    this.emit('auth', null);
+                    this.logger.info('Authenticated successfully but no broadcaster info found');
+                }
+            } catch (error: any) {
+                this.logger.warn('Failed to get broadcaster info:', error);
+                this._isAuthenticated = true;
+                this.emit('auth', null);
+                this.logger.info('Authenticated successfully but failed to fetch broadcaster info');
+            }
         } catch (error: any) {
             this.logger.error('Authentication failed:', error);
             this._isAuthenticated = false;
-            this.emit('auth', false);
+            this.emit('auth', null);
             this.emit('error', error);
             throw error;
         }
@@ -273,7 +293,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
         await this.disconnect();
         youtubeAuthStore.getState().clearTokens();
         this._isAuthenticated = false;
-        this.emit('auth', false);
+        this.emit('auth', null);
         this.logger.info('Logged out');
     }
 }

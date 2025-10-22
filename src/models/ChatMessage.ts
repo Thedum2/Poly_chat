@@ -6,3 +6,8 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+export interface BroadcasterInfo {
+  nickname: string;
+  profileImageUrl: string;
+}
+

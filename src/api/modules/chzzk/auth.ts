@@ -41,5 +41,5 @@ export const chzzkAuthApi = {
     //======================
     revokeAccessToken: async (data: TokenRevokeRequest): Promise<TokenRevokeResponse> => {
         return httpClient.post(`${chzzkApiUrl}/auth/v1/token/revoke`, data, (data) => data as TokenRevokeResponse);
-    }
+    },
 };
