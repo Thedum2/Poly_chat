@@ -3,7 +3,7 @@ import { API_ENDPOINTS } from "../../config";
 import {GetChannelInfoResponse, GetUserInfoResponse} from "../../model/chzzk/channel";
 import {chzzkAuthStore} from "../../../store/chzzkAuthStore";
 
-const chzzkApiUrl = API_ENDPOINTS.Chzzk;
+const getChzzkApiUrl = () => chzzkAuthStore.getState().apiBaseUrl;
 
 export const chzzkChannelApi = {
 
@@ -12,7 +12,7 @@ export const chzzkChannelApi = {
     //======================
     getUserInfo: async (): Promise<GetUserInfoResponse> => {
         return httpClient.get(
-            `${chzzkApiUrl}/open/v1/users/me`,
+            `${getChzzkApiUrl()}/open/v1/users/me`,
             (data) => data as any,
             {
                 headers: {
@@ -33,7 +33,7 @@ export const chzzkChannelApi = {
         }
 
         return httpClient.get(
-            `${chzzkApiUrl}/open/v1/channels?channelIds=${channelIds}`,
+            `${getChzzkApiUrl()}/open/v1/channels?channelIds=${channelIds}`,
             (data) => data as any,
             {
                 headers: {

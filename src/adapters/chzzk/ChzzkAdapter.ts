@@ -58,6 +58,10 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         this.clientSecret = options.clientSecret;
         this.redirectUri = options.redirectUri;
 
+        if (options.apiBaseUrl) {
+            chzzkAuthStore.getState().setApiBaseUrl(options.apiBaseUrl);
+        }
+
         try {
             this.code = await this.openAuthPopup();
             this.logger.info('OAuth code received');

@@ -4,6 +4,7 @@ export interface ChzzkInitOptions extends InitOptions{
     clientId: string;
     clientSecret: string;
     redirectUri: string;
+    apiBaseUrl?: string;
 }
 
 export interface SoopInitOptions extends InitOptions{

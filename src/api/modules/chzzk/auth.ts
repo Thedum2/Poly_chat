@@ -9,8 +9,9 @@ import {
     TokenRevokeRequest,
     TokenRevokeResponse
 } from "../../model/chzzk/auth";
+import { chzzkAuthStore } from "../../../store/chzzkAuthStore";
 
-const chzzkApiUrl = API_ENDPOINTS.Chzzk;
+const getChzzkApiUrl = () => chzzkAuthStore.getState().apiBaseUrl;
 
 export const chzzkAuthApi = {
 
@@ -27,12 +28,12 @@ export const chzzkAuthApi = {
     //======================
     getAccessToken: async (data: TokenIssueRequest): Promise<TokenIssueResponse> => {
         return httpClient.post(
-            `${chzzkApiUrl}/auth/v1/token`,
+            `${getChzzkApiUrl()}/auth/v1/token`,
             data,
             (data) => data as TokenIssueResponse,
             {
                 headers: {
-                    
+
                 }
             }
         );
@@ -43,12 +44,12 @@ export const chzzkAuthApi = {
     //======================
     refreshAccessToken: async (data: TokenRefreshRequest): Promise<TokenRefreshResponse> => {
         return httpClient.post(
-            `${chzzkApiUrl}/auth/v1/token`,
+            `${getChzzkApiUrl()}/auth/v1/token`,
             data,
             (data) => data as TokenRefreshResponse,
             {
                 headers: {
-                    
+
                 }
             }
         );
@@ -59,12 +60,12 @@ export const chzzkAuthApi = {
     //======================
     revokeAccessToken: async (data: TokenRevokeRequest): Promise<TokenRevokeResponse> => {
         return httpClient.post(
-            `${chzzkApiUrl}/auth/v1/token/revoke`,
+            `${getChzzkApiUrl()}/auth/v1/token/revoke`,
             data,
             (data) => data as TokenRevokeResponse,
             {
                 headers: {
-                    
+
                 }
             }
         );

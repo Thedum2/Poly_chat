@@ -257,6 +257,7 @@ function App() {
           clientId: config.clientId,
           clientSecret: config.clientSecret || '',
           redirectUri: config.redirectUri,
+          apiBaseUrl: '/api/chzzk',
         });
       } else if (platform === 'youtube') {
         // YouTube requires redirectUri
