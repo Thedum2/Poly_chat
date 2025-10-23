@@ -4,8 +4,6 @@ export const PLATFORM_NAME = {
     YOUTUBE : "youtube",
 }
 
-const isBrowser = typeof window !== 'undefined';
-
 export const youTubeScope = (): string => {
     return [
         'https://www.googleapis.com/auth/userinfo.email',
@@ -15,8 +13,8 @@ export const youTubeScope = (): string => {
     ].join(' ');
 };
 export const API_ENDPOINTS = {
-    Chzzk : isBrowser ? "/api/chzzk" : "https://openapi.chzzk.naver.com",
-    Soop : isBrowser ? "/api/soop" : "https://api.sooplive.co.kr",
-    Youtube : "www.youtube.com",
+    Chzzk : "/api/chzzk",
+    Soop : "/api/soop",
+    Youtube : "https://www.googleapis.com",
 }
 export const API_TIMEOUT_MS = 15000;

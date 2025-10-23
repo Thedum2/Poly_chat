@@ -9,7 +9,7 @@ const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
 export const youtubeLiveBroadcastApi = {
 
     //======================
-    // 1. 활성 방송 목록 가져오기
+    // 활성 방송 목록 가져오기
     //======================
     listLiveBroadcasts: async (
         accessToken: string,
@@ -22,6 +22,7 @@ export const youtubeLiveBroadcastApi = {
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
                 },
             }
         );

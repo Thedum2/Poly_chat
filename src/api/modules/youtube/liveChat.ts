@@ -9,7 +9,7 @@ const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
 export const youtubeLiveChatApi = {
 
     //======================
-    // 1. Live Chat 메시지 목록 가져오기
+    // 메시지 목록 가져오기
     //======================
     listLiveChatMessages: async (
         accessToken: string,
@@ -28,6 +28,7 @@ export const youtubeLiveChatApi = {
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
                 },
             }
         );

@@ -16,6 +16,7 @@ export const chzzkSessionApi = {
             headers: {
                 'Client-Id': clientId,
                 'Client-Secret': clientSecret,
+                'Accept': 'application/json'
             }
         });
 
@@ -25,19 +26,34 @@ export const chzzkSessionApi = {
     subscribeToChat: async (data: EventsSubscribeRequest): Promise<void> => {
         const formData = new FormData();
         formData.append('sessionKey', data.sessionKey);
-        await httpClient.post(`${chzzkApiUrl}/open/v1/sessions/events/subscribe/chat`, formData, (data) => data, { headers: { 'Authorization': `Bearer ${chzzkAuthStore.getState().accessToken}` } });
+        await httpClient.post(`${chzzkApiUrl}/open/v1/sessions/events/subscribe/chat`, formData, (data) => data, {
+            headers: {
+                'Authorization': `Bearer ${chzzkAuthStore.getState().accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
     },
 
     subscribeToDonation: async (data: EventsSubscribeRequest): Promise<void> => {
         const formData = new FormData();
         formData.append('sessionKey', data.sessionKey);
-        await httpClient.post(`${chzzkApiUrl}/open/v1/sessions/events/subscribe/donation`, formData, (data) => data, { headers: { 'Authorization': `Bearer ${chzzkAuthStore.getState().accessToken}` } });
+        await httpClient.post(`${chzzkApiUrl}/open/v1/sessions/events/subscribe/donation`, formData, (data) => data, {
+            headers: {
+                'Authorization': `Bearer ${chzzkAuthStore.getState().accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
     },
 
     subscribeToSubscription: async (data: EventsSubscribeRequest): Promise<void> => {
         const formData = new FormData();
         formData.append('sessionKey', data.sessionKey);
-        await httpClient.post(`${chzzkApiUrl}/open/v1/sessions/events/subscribe/subscription`, formData, (data) => data, { headers: { 'Authorization': `Bearer ${chzzkAuthStore.getState().accessToken}` } });
+        await httpClient.post(`${chzzkApiUrl}/open/v1/sessions/events/subscribe/subscription`, formData, (data) => data, {
+            headers: {
+                'Authorization': `Bearer ${chzzkAuthStore.getState().accessToken}`,
+                'Accept': 'application/json'
+            }
+        });
     },
 
 };

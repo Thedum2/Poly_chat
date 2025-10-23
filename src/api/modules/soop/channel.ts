@@ -15,7 +15,8 @@ export const soopAuthApi = {
             (data) => data as any,
             {
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': '*/*'
                 }
             }
         );

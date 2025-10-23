@@ -26,20 +26,47 @@ export const chzzkAuthApi = {
     // 2. 치지직 Access Token 발급
     //======================
     getAccessToken: async (data: TokenIssueRequest): Promise<TokenIssueResponse> => {
-        return httpClient.post(`${chzzkApiUrl}/auth/v1/token`, data, (data) => data as TokenIssueResponse);
+        return httpClient.post(
+            `${chzzkApiUrl}/auth/v1/token`,
+            data,
+            (data) => data as TokenIssueResponse,
+            {
+                headers: {
+                    
+                }
+            }
+        );
     },
 
     //======================
     // 3. 치지직 Access Token 갱신
     //======================
     refreshAccessToken: async (data: TokenRefreshRequest): Promise<TokenRefreshResponse> => {
-        return httpClient.post(`${chzzkApiUrl}/auth/v1/token`, data, (data) => data as TokenRefreshResponse);
+        return httpClient.post(
+            `${chzzkApiUrl}/auth/v1/token`,
+            data,
+            (data) => data as TokenRefreshResponse,
+            {
+                headers: {
+                    
+                }
+            }
+        );
     },
 
     //======================
     // 4. 치지직 Access Token 삭제
     //======================
     revokeAccessToken: async (data: TokenRevokeRequest): Promise<TokenRevokeResponse> => {
-        return httpClient.post(`${chzzkApiUrl}/auth/v1/token/revoke`, data, (data) => data as TokenRevokeResponse);
+        return httpClient.post(
+            `${chzzkApiUrl}/auth/v1/token/revoke`,
+            data,
+            (data) => data as TokenRevokeResponse,
+            {
+                headers: {
+                    
+                }
+            }
+        );
     },
 };

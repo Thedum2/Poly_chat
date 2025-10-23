@@ -24,7 +24,7 @@ export default defineConfig({
         }
       },
       '/api/soop': {
-        target: 'https://api.sooplive.co.kr',
+        target: 'https://openapi.sooplive.co.kr',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/soop/, ''),
         secure: false,

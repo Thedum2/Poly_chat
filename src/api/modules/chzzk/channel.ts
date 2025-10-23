@@ -8,7 +8,7 @@ const chzzkApiUrl = API_ENDPOINTS.Chzzk;
 export const chzzkChannelApi = {
 
     //======================
-    // 5. 치지직 사용자 정보 가져오기
+    // 치지직 사용자 정보 가져오기
     //======================
     getUserInfo: async (): Promise<GetUserInfoResponse> => {
         return httpClient.get(
@@ -16,7 +16,8 @@ export const chzzkChannelApi = {
             (data) => data as any,
             {
                 headers: {
-                    'Authorization': `Bearer ${chzzkAuthStore.getState().accessToken}`
+                    'Authorization': `Bearer ${chzzkAuthStore.getState().accessToken}`,
+                    'Accept': 'application/json'
                 }
             }
         );
@@ -37,7 +38,8 @@ export const chzzkChannelApi = {
             {
                 headers: {
                     'Client-Id': clientId,
-                    'Client-Secret': clientSecret
+                    'Client-Secret': clientSecret,
+                    'Accept': 'application/json'
                 }
             }
         );
