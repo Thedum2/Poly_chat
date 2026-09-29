@@ -13,7 +13,7 @@ export const youTubeScope = (): string => {
     ].join(' ');
 };
 export const API_ENDPOINTS = {
-    Chzzk : "CHZZK_API_URL", //CHZZK은 프록시 사용(CORS),
+    Chzzk : "https://openapi.chzzk.naver.com",
     Soop : "https://openapi.sooplive.co.kr",
     Youtube : "https://www.googleapis.com",
 }

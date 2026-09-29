@@ -13,29 +13,33 @@ async function loadConfig(env) {
   return module.namespace;
 }
 
-test('local Vite serve keeps the CHZZK proxy even with public mode defaults', async () => {
+test('local Vite serve uses the local YouTube relay even with public mode defaults', async () => {
   const config = await loadConfig({ DEV: true, MODE: 'development', VITE_API_URL: 'https://api-dev.galashow.cloud' });
-  assert.equal(config.CHZZK_API_BASE_URL, '/api/chzzk');
   assert.equal(config.YOUTUBE_STREAM_URL, '/api/youtube/chat/stream');
+  assert.equal(config.RELAY_API_BASE_URL, '/api');
+  assert.equal(config.CHZZK_API_BASE_URL, '/api/chzzk');
+  assert.equal(config.SOOP_API_BASE_URL, '/api/soop');
+  assert.equal(config.YOUTUBE_API_BASE_URL, '/api/youtube');
 });
 
-test('static builds use the matching API without relying on a Vite proxy', async () => {
+test('static builds use the matching API for the YouTube relay', async () => {
   for (const [mode, expected] of [
-    ['development', 'https://api-dev.galashow.cloud/chzzk'],
-    ['production', 'https://api.galashow.cloud/chzzk'],
+    ['development', 'https://api-dev.galashow.cloud/youtube/chat/stream'],
+    ['production', 'https://api.galashow.cloud/youtube/chat/stream'],
   ]) {
     for (const value of [undefined, '', '   ']) {
       const config = await loadConfig({ DEV: false, MODE: mode, VITE_API_URL: value });
-      assert.equal(config.CHZZK_API_BASE_URL, expected);
-      assert.equal(config.YOUTUBE_STREAM_URL, expected.replace('/chzzk', '/youtube/chat/stream'));
+      assert.equal(config.YOUTUBE_STREAM_URL, expected);
+      assert.equal(config.CHZZK_API_BASE_URL, expected.replace('/youtube/chat/stream', '/chzzk'));
+      assert.equal(config.SOOP_API_BASE_URL, expected.replace('/youtube/chat/stream', '/soop'));
     }
   }
 });
 
-test('deployed API overrides do not create a double slash before the CHZZK route', async () => {
+test('deployed API overrides do not create a double slash before the YouTube relay route', async () => {
   const config = await loadConfig({ DEV: false, MODE: 'production', VITE_API_URL: ' http://localhost:8080/api/// ' });
-  assert.equal(config.CHZZK_API_BASE_URL, 'http://localhost:8080/api/chzzk');
   assert.equal(config.YOUTUBE_STREAM_URL, 'http://localhost:8080/api/youtube/chat/stream');
+  assert.equal(config.RELAY_API_BASE_URL, 'http://localhost:8080/api');
 });
 
 test('YouTube relay URL can point to an independently hosted server', async () => {

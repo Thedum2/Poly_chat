@@ -1,4 +1,5 @@
 import {EventEmitter} from 'events';
+import {platformApiUrl} from '../../api/relay';
 import {IChatAdapter} from '../../ports/IChatAdapter';
 import {ChzzkAuthOptions, ChzzkInitOptions} from '../../models/Auth';
 import {chzzkAuthApi} from '../../api/modules/chzzk/auth';
@@ -14,11 +15,18 @@ import {v4 as uuidv4} from 'uuid';
 import {createLogger} from '../../utils/logger';
 import {chzzkChannelApi} from "../../api/modules/chzzk/channel";
 
+function safeChzzkError(error: unknown): string {
+    const status = (error as { response?: { status?: unknown } })?.response?.status;
+    return typeof status === 'number' ? `HTTP ${status}` : 'Request failed';
+}
+
 export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
     readonly platform = 'chzzk';
     private _isAuthenticated = false;
     private _isConnected = false;
     private code: string = '';
+    private clientId: string = '';
+    private apiBaseUrl = '/api/chzzk';
     private authPopup: Window | null = null;
     private state: string = '';
     private logger = createLogger('[CHZZK]');
@@ -56,20 +64,21 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         } catch {
         }
 
-        if (options.apiBaseUrl) {
-            chzzkAuthStore.getState().setApiBaseUrl(options.apiBaseUrl);
-        }
+        if (!options.clientId.trim()) throw new Error('CHZZK clientId is required');
+        this.apiBaseUrl = platformApiUrl('chzzk', '', options.apiBaseUrl).replace(/\/$/, '');
+        this.clientId = options.clientId;
+        this.code = '';
+        this.state = '';
+        chzzkAuthStore.getState().clearTokens();
 
-        // Open while still in the click handler; browsers block popups opened after a fetch.
+        // Open in the click handler so the browser permits the OAuth popup.
         this.authPopup = window.open('about:blank', 'Chzzk OAuth', 'width=500,height=700,left=100,top=100');
         if (!this.authPopup) throw new Error('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.');
 
         try {
-            const config = await chzzkAuthApi.getConfig();
-            if (!config.content?.clientId) throw new Error('CHZZK public client ID is unavailable');
             this.state = uuidv4();
             this.authPopup.location.href = chzzkAuthApi.getAuthCodeUrl({
-                clientId: config.content.clientId,
+                clientId: this.clientId,
                 redirectUri: callback.href,
                 state: this.state,
             });
@@ -82,7 +91,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
             this.state = '';
             if (this.authPopup && !this.authPopup.closed) this.authPopup.close();
             this.authPopup = null;
-            this.logger.error('OAuth popup failed:', error);
+            this.logger.error('OAuth popup failed:', safeChzzkError(error));
             this.emit('error', error);
             throw error;
         }
@@ -138,16 +147,17 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         });
     }
 
-    async authenticate(_options: ChzzkAuthOptions): Promise<void> {
+    async authenticate(options: ChzzkAuthOptions): Promise<void> {
         try {
-            if (!this.code || !this.state) {
+            if (!this.clientId || !this.code || !this.state) {
                 throw new Error('A validated CHZZK OAuth callback is required');
             }
 
             const tokens = await chzzkAuthApi.getAccessToken({
+                clientId: this.clientId,
                 code: this.code,
                 state: this.state,
-            });
+            }, this.apiBaseUrl);
             this.code = '';
             this.state = '';
 
@@ -157,8 +167,8 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
             });
 
             try {
-                const userInfo = await chzzkChannelApi.getUserInfo();
-                const channelInfo = await chzzkChannelApi.getChannelInfo(userInfo.content.channelId);
+                const userInfo = await chzzkChannelApi.getUserInfo(this.apiBaseUrl);
+                const channelInfo = await chzzkChannelApi.getChannelInfo(userInfo.content.channelId, undefined, this.apiBaseUrl);
 
                 if (channelInfo.content.data.length > 0) {
                     const channel = channelInfo.content.data[0];
@@ -174,13 +184,13 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                     this.logger.info('Authenticated successfully but no broadcaster info found');
                 }
             } catch (error: any) {
-                this.logger.warn('Failed to get broadcaster info:', error);
+                this.logger.warn('Failed to get broadcaster info:', safeChzzkError(error));
                 this._isAuthenticated = true;
                 this.emit('auth', null);
                 this.logger.info('Authenticated successfully but failed to fetch broadcaster info');
             }
         } catch (error: any) {
-            this.logger.error('Authentication failed:', error);
+            this.logger.error('Authentication failed:', safeChzzkError(error));
             this._isAuthenticated = false;
             this.emit('auth', null);
             this.emit('error', error);
@@ -196,7 +206,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         this._isConnected = false;
 
         try {
-            const sessionResponse = await chzzkSessionApi.createClientSession();
+            const sessionResponse = await chzzkSessionApi.createClientSession(this.apiBaseUrl);
             this.opts.url = sessionResponse.content.url;
 
             const socket = getSocket(this.opts);
@@ -219,7 +229,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                             this._isConnected = false;
                             socket.disconnect();
                             this.emit('disconnected');
-                            this.logger.error('Event subscription failed:', error);
+                            this.logger.error('Event subscription failed:', safeChzzkError(error));
                             this.emit('error', error);
                         }
                         break;
@@ -236,7 +246,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                         break;
                     case SYSTEM_MESSAGE_TYPE.UNKNOWN:
                     default:
-                        this.logger.debug('System message: unknown', result);
+                        this.logger.debug('System message: unknown');
                         break;
                 }
             });
@@ -267,7 +277,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                 this.emit('subscription', sub);
             });
         } catch (error) {
-            this.logger.error('Connection failed:', error);
+            this.logger.error('Connection failed:', safeChzzkError(error));
             this.emit('error', error);
             throw error;
         }
@@ -287,6 +297,9 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         await this.disconnect();
         chzzkAuthStore.getState().clearTokens();
         this._isAuthenticated = false;
+        this.clientId = '';
+        this.code = '';
+        this.state = '';
         this.emit('auth', null);
         this.logger.info('Logged out');
     }
@@ -311,7 +324,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         const sessionKey = chzzkAuthStore.getState().sessionKey;
         if (!sessionKey) return;
 
-        await chzzkSessionApi.subscribeToChat({sessionKey});
+        await chzzkSessionApi.subscribeToChat({sessionKey}, this.apiBaseUrl);
         this.logger.debug('Subscribed to chat');
     }
 
@@ -319,7 +332,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         const sessionKey = chzzkAuthStore.getState().sessionKey;
         if (!sessionKey) return;
 
-        await chzzkSessionApi.subscribeToDonation({sessionKey});
+        await chzzkSessionApi.subscribeToDonation({sessionKey}, this.apiBaseUrl);
         this.logger.debug('Subscribed to donation');
     }
 
@@ -327,7 +340,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         const sessionKey = chzzkAuthStore.getState().sessionKey;
         if (!sessionKey) return;
 
-        await chzzkSessionApi.subscribeToSubscription({sessionKey});
+        await chzzkSessionApi.subscribeToSubscription({sessionKey}, this.apiBaseUrl);
         this.logger.debug('Subscribed to subscription');
     }
 }

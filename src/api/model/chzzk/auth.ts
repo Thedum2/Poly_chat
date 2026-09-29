@@ -13,7 +13,13 @@ export interface AuthCodeResponse{
 }
 
 {/*치지직 Access Token 발급 */}
-export interface TokenIssueRequest {
+export interface ClientCredentials {
+    clientId: string;
+    /** @deprecated Supplied only by the relay server. Ignored by browser calls. */
+    clientSecret?: string;
+}
+
+export interface TokenIssueRequest extends ClientCredentials {
     code: string;
     state: string;
 }
@@ -28,7 +34,7 @@ export interface TokenIssueResponse extends ResponseBase{
 }
 
 {/* Access Token 갱신 */}
-export interface TokenRefreshRequest {
+export interface TokenRefreshRequest extends ClientCredentials {
     refreshToken: string;
 }
 export interface TokenRefreshResponse extends ResponseBase{
@@ -42,16 +48,12 @@ export interface TokenRefreshResponse extends ResponseBase{
 }
 
 {/* 치지직 Access Token 삭제 */}
-export interface TokenRevokeRequest {
+export interface TokenRevokeRequest extends ClientCredentials {
     token: string;
     tokenTypeHint?: 'access_token' | 'refresh_token';
 }
 export interface TokenRevokeResponse extends ResponseBase{
     content: unknown;
-}
-
-export interface PublicConfigResponse extends ResponseBase {
-    content: { clientId: string };
 }
 
 {/* 사용자 정보 조회 */}

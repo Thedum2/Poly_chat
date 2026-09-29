@@ -1,13 +1,17 @@
-export interface InitOptions{}
+export interface InitOptions{
+    /** Trusted per-platform relay base. Defaults to /api/{platform}. */
+    apiBaseUrl?: string;
+}
 
 export interface ChzzkInitOptions extends InitOptions{
+    clientId: string;
     redirectUri: string;
-    apiBaseUrl?: string;
 }
 
 export interface SoopInitOptions extends InitOptions{
     clientId: string;
-    clientSecret: string;
+    /** @deprecated Configure SOOP_CLIENT_SECRET on the relay server instead. Ignored. */
+    clientSecret?: string;
 }
 
 export interface YouTubeInitOptions extends InitOptions{
@@ -24,9 +28,12 @@ export interface YouTubeAuthOptions extends AuthOptions {
 }
 
 export interface ChzzkAuthOptions extends AuthOptions {
+    /** @deprecated Configure CHZZK_CLIENT_SECRET on the relay server instead. Ignored. */
+    clientSecret?: string;
 }
 
 export interface SoopAuthOptions extends AuthOptions {
-    clientId: string;
-    clientSecret: string;
+    clientId?: string;
+    /** @deprecated Configure SOOP_CLIENT_SECRET on the relay server instead. Ignored. */
+    clientSecret?: string;
 }

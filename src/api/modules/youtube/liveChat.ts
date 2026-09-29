@@ -4,7 +4,7 @@ import {
     LiveChatMessagesListResponse,
 } from "../../model/youtube/liveChat";
 
-const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
+import { platformApiUrl } from "../../relay";
 
 export const youtubeLiveChatApi = {
 
@@ -13,7 +13,8 @@ export const youtubeLiveChatApi = {
     //======================
     listLiveChatMessages: async (
         accessToken: string,
-        request: LiveChatMessagesListRequest
+        request: LiveChatMessagesListRequest,
+        apiBaseUrl?: string,
     ): Promise<LiveChatMessagesListResponse> => {
         const params = new URLSearchParams({
             liveChatId: request.liveChatId,
@@ -23,7 +24,7 @@ export const youtubeLiveChatApi = {
         });
 
         return httpClient.get(
-            `${YOUTUBE_API_BASE_URL}/liveChat/messages?${params.toString()}`,
+            platformApiUrl('youtube', `/youtube/v3/liveChat/messages?${params.toString()}`, apiBaseUrl),
             (data) => data as LiveChatMessagesListResponse,
             {
                 headers: {

@@ -11,7 +11,7 @@ const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const npmCli = process.env.npm_execpath;
 assert.ok(npmCli, 'Run this check with npm run test:package.');
 const npm = (args, cwd = root) => execFileSync(process.execPath, [npmCli, ...args], {
-  cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'],
+    cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], windowsHide: true,
 });
 
 const artifacts = join(root, '.artifacts');

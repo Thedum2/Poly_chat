@@ -51,6 +51,7 @@ async function setup(t: TestContext, failures: Record<string, number> = {}) {
     });
   }
   const adapter = new module.exports.ChzzkAdapter();
+  (adapter as any).clientId = 'test-client-id';
   (adapter as any).code = 'test-code';
   (adapter as any).state = 'test-state';
   const errors: Error[] = [];
@@ -59,7 +60,7 @@ async function setup(t: TestContext, failures: Record<string, number> = {}) {
   adapter.on('error', (error: Error) => errors.push(error));
   adapter.on('connected', () => connectedEvents++);
   adapter.on('disconnected', () => disconnectedEvents++);
-  await adapter.authenticate({});
+  await adapter.authenticate({ clientSecret: 'test-secret' });
   await adapter.connect();
   return {
     adapter, requests, errors,

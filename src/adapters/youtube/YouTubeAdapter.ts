@@ -1,4 +1,5 @@
 import {EventEmitter} from 'events';
+import {platformApiUrl} from '../../api/relay';
 import {IChatAdapter} from '../../ports/IChatAdapter';
 import {YouTubeAuthOptions, YouTubeInitOptions} from '../../models/Auth';
 import {youtubeAuthStore} from '../../store/youtubeAuthStore';
@@ -19,6 +20,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
     private redirectUri: string = '';
     private authPopup: Window | null = null;
     private state: string = '';
+    private apiBaseUrl = '/api/youtube';
     private streamUrl = '/api/youtube/chat/stream';
     private streamController: AbortController | null = null;
     private logger = createLogger('[YouTube]');
@@ -43,7 +45,8 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
         this.clientId = options.clientId;
         this.redirectUri = options.redirectUri;
 
-        this.streamUrl = options.streamUrl?.trim() || '/api/youtube/chat/stream';
+        this.apiBaseUrl = platformApiUrl('youtube', '', options.apiBaseUrl).replace(/\/$/, '');
+        this.streamUrl = options.streamUrl?.trim() || platformApiUrl('youtube', '/chat/stream', this.apiBaseUrl);
 
         try {
             if (new URL(this.redirectUri).origin !== window.location.origin) {
@@ -163,7 +166,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
             }
 
             try {
-                const channelInfo = await youtubeChannelApi.getChannelInfo();
+                const channelInfo = await youtubeChannelApi.getChannelInfo(this.apiBaseUrl);
 
                 if (channelInfo.items && channelInfo.items.length > 0) {
                     const channel = channelInfo.items[0];
@@ -179,7 +182,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
                     this.logger.info('Authenticated successfully but no broadcaster info found');
                 }
             } catch (error: any) {
-                this.logger.warn('Failed to get broadcaster info:', error);
+                this.logger.warn('Failed to get broadcaster info:', error instanceof Error ? error.message : 'Request failed');
                 this._isAuthenticated = true;
                 this.emit('auth', null);
                 this.logger.info('Authenticated successfully but failed to fetch broadcaster info');
@@ -206,7 +209,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
         try {
             const accessToken = youtubeAuthStore.getState().accessToken;
             if (!accessToken) throw new Error('No access token available');
-            const broadcasts = await youtubeLiveBroadcastApi.listLiveBroadcasts(accessToken, {mine: true}, signal);
+            const broadcasts = await youtubeLiveBroadcastApi.listLiveBroadcasts(accessToken, {mine: true}, signal, this.apiBaseUrl);
             if (signal.aborted) return;
             const liveChatId = broadcasts.items.find(item => item.snippet.liveChatId)?.snippet.liveChatId;
             if (!liveChatId) throw new Error('라이브 채팅을 찾을 수 없습니다. 라이브 스트리밍을 시작한 후 다시 시도해주세요.');
@@ -215,7 +218,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
             if (signal.aborted) return;
             this.stopStreaming();
             this._isConnected = false;
-            this.logger.error('Connection failed:', error);
+            this.logger.error('Connection failed:', error instanceof Error ? error.message : 'Request failed');
             this.emit('error', error);
             throw error;
         }

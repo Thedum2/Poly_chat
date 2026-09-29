@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
-import { CHZZK_API_BASE_URL, YOUTUBE_STREAM_URL } from './config';
+import { CHZZK_API_BASE_URL, SOOP_API_BASE_URL, YOUTUBE_API_BASE_URL, YOUTUBE_STREAM_URL, RELAY_API_BASE_URL } from './config';
 import { ChzzkAdapter, SoopAdapter, YouTubeAdapter, ChatMessage, PolyChat, BroadcasterInfo } from 'polychat-bridge';
 
 import type { AdapterState, DisplayMessage, Platform, PlatformConfig } from './types';
@@ -90,7 +90,7 @@ function App() {
     };
 
     const handleError = ({ platform, error }: { platform: string; error: Error }) => {
-      console.log(`[${platform.toUpperCase()}] Error:`, error);
+      console.log(`[${platform.toUpperCase()}] Error:`, platform === 'chzzk' ? 'Request failed' : error);
       updateAdapterState(platform as Platform, { error: error.message });
       addSystemMessage(platform as Platform, `❌ 오류 발생: ${error.message}`);
     };
@@ -167,13 +167,40 @@ function App() {
     },
     soop: {
       clientId: import.meta.env.VITE_SOOP_CLIENT_ID || '',
-      clientSecret: import.meta.env.VITE_SOOP_CLIENT_SECRET || '',
     },
     youtube: {
       clientId: import.meta.env.VITE_YOUTUBE_CLIENT_ID || '',
       redirectUri: `${window.location.origin}/callback`,
     },
   });
+
+  const [relayError, setRelayError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${RELAY_API_BASE_URL}/config`, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error('Relay unavailable');
+        return response.json();
+      })
+      .then(publicConfig => {
+        if (controller.signal.aborted) return;
+        setConfigs(current => {
+          const next = { ...current };
+          for (const platform of ['chzzk', 'soop', 'youtube'] as const) {
+            const clientId = publicConfig[platform]?.clientId;
+            if (!current[platform].clientId && typeof clientId === 'string') {
+              next[platform] = { ...current[platform], clientId };
+            }
+          }
+          return next;
+        });
+        setRelayError('');
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setRelayError('연결 설정을 불러오지 못했습니다. 중계 서버가 실행 중인지 확인해주세요.');
+      });
+    return () => controller.abort();
+  }, []);
 
   const togglePlatform = (platform: Platform) => {
     setSelectedPlatforms((prev) => {
@@ -233,6 +260,7 @@ function App() {
         }
         await (adapter as ChzzkAdapter).init({
           redirectUri: config.redirectUri,
+          clientId: config.clientId,
           apiBaseUrl: CHZZK_API_BASE_URL,
         });
       } else if (platform === 'youtube') {
@@ -244,12 +272,13 @@ function App() {
           clientId: config.clientId,
           redirectUri: config.redirectUri,
           streamUrl: YOUTUBE_STREAM_URL,
+          apiBaseUrl: YOUTUBE_API_BASE_URL,
         });
       } else {
         // SOOP doesn't require redirectUri
         await (adapter as SoopAdapter).init({
           clientId: config.clientId,
-          clientSecret: config.clientSecret || '',
+          apiBaseUrl: SOOP_API_BASE_URL,
         });
       }
 
@@ -273,7 +302,7 @@ function App() {
       } else if (platform === 'soop') {
         await (adapterState.adapter as SoopAdapter).authenticate({
           clientId: config.clientId,
-          clientSecret: config.clientSecret || '',
+          apiBaseUrl: CHZZK_API_BASE_URL,
         });
       } else if (platform === 'youtube') {
         await (adapterState.adapter as YouTubeAdapter).authenticate({});
@@ -363,6 +392,7 @@ function App() {
           onToggle={togglePlatform}
           onUpdateConfig={updateConfig}
           onConfigure={handleConfigure}
+          relayError={relayError}
         />
       )}
     </DashboardShell>

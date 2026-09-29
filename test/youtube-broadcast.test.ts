@@ -12,8 +12,8 @@ test('broadcast lookup requests the snippet containing liveChatId', async (t) =>
     return { items: [] };
   });
   await youtubeLiveBroadcastApi.listLiveBroadcasts('test-token', { mine: true }, signal);
-  const url = new URL(requestUrl);
-  assert.equal(url.pathname, '/youtube/v3/liveBroadcasts');
+  const url = new URL(requestUrl, 'http://localhost');
+  assert.equal(url.pathname, '/api/youtube/youtube/v3/liveBroadcasts');
   assert.equal(url.searchParams.get('mine'), 'true');
   assert.equal(
     url.searchParams.get('part'),

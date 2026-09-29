@@ -4,7 +4,6 @@ export type Platform = 'chzzk' | 'soop' | 'youtube';
 
 export interface PlatformConfig {
   clientId: string;
-  clientSecret?: string;
   redirectUri?: string;
 }
 

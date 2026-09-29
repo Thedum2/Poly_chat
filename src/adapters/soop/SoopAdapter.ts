@@ -6,8 +6,9 @@ import { soopAuthStore } from '../../store/soopAuthStore';
 import {ISoopChatSDK, ISoopChatSDKConstructor} from "../../api/model/soop/sdk";
 import {SOOP_ACTION, SoopAction, SoopMessage} from "../../api/model/soop/soopMessage";
 import {createLogger} from '../../utils/logger';
-import {buildSoopAuthUrl} from "../../api/modules/soop/auth";
+import {buildSoopAuthUrl, soopTokenApi} from "../../api/modules/soop/auth";
 import {soopAuthApi} from "../../api/modules/soop/channel";
+import {platformApiUrl} from '../../api/relay';
 
 declare global {
     interface Window {
@@ -21,6 +22,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
     private _isConnected = false;
     private chatSDK: ISoopChatSDK | null = null;
     private clientId: string = '';
+    private apiBaseUrl?: string;
     private code: string = '';
     private authPopup: Window | null = null;
     private logger = createLogger('[SOOP]');
@@ -38,20 +40,19 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
             throw new Error('SOOP adapter requires browser environment');
         }
 
+        this.apiBaseUrl = options.apiBaseUrl;
         await new Promise<void>((resolve, reject) => {
             const script = document.createElement('script');
-            script.src = 'https://static.sooplive.co.kr/asset/app/chat-sdk/sooplive-chat-sdk.js';
+            script.src = platformApiUrl('soop', '/sdk.js', this.apiBaseUrl);
             script.async = true;
 
             script.onload = () => {
-                setTimeout(() => {
-                    try {
-                        this.initializeChatSDK(options);
-                        resolve();
-                    } catch (e) {
-                        reject(e);
-                    }
-                }, 200);
+                try {
+                    this.initializeChatSDK(options);
+                    resolve();
+                } catch (e) {
+                    reject(e);
+                }
             };
 
             script.onerror = (err) => {
@@ -81,7 +82,8 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         }
 
         const ChatSDKConstructor = this.findChatSDKConstructor();
-        this.chatSDK = new ChatSDKConstructor(options.clientId, options.clientSecret);
+        // The SDK handles chat WebSockets; OAuth credentials remain on our server.
+        this.chatSDK = new ChatSDKConstructor(options.clientId, '');
         this.clientId = options.clientId;
         this.logger.debug('ChatSDK instance created');
     }
@@ -169,12 +171,12 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
         throw new Error(`SOOP ChatSDK constructor not found. Keys: ${Object.keys(window.SOOP!).join(', ')}`);
     }
 
-    async authenticate(options: SoopAuthOptions): Promise<void> {
+    async authenticate(_options: SoopAuthOptions = {}): Promise<void> {
         try {
             if (!this.chatSDK) {
                 throw new Error('ChatSDK not initialized. Call init() first.');
             }
-            const tokens = await this.chatSDK.getAuth(this.code);
+            const tokens = await soopTokenApi.getAccessToken(this.code, this.apiBaseUrl);
             soopAuthStore.getState().setTokens({
                 accessToken: tokens.access_token,
                 refreshToken: tokens.refresh_token,
@@ -183,7 +185,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
             this.chatSDK.setAuth(tokens.access_token);
 
             try {
-                const stationInfo = await soopAuthApi.getStationInfo();
+                const stationInfo = await soopAuthApi.getStationInfo(this.apiBaseUrl);
 
                 if (stationInfo.result === 1 && stationInfo.data) {
                     this._isAuthenticated = true;
@@ -198,13 +200,13 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
                     this.logger.info('Authenticated successfully but no broadcaster info found');
                 }
             } catch (error: any) {
-                this.logger.warn('Failed to get broadcaster info:', error);
+                this.logger.warn('Failed to get broadcaster info');
                 this._isAuthenticated = true;
                 this.emit('auth', null);
                 this.logger.info('Authenticated successfully but failed to fetch broadcaster info');
             }
         } catch (error: any) {
-            this.logger.error('Authentication failed:', error);
+            this.logger.error('Authentication failed');
             this._isAuthenticated = false;
             this.emit('auth', null);
             this.emit('error', error);
@@ -247,7 +249,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
                 this.emit('error', err);
             });
         } catch (error: any) {
-            this.logger.error('Connection failed:', error);
+            this.logger.error('Connection failed');
             this._isConnected = false;
             this.emit('error', error);
             throw error;

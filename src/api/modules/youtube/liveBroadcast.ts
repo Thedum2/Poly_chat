@@ -4,7 +4,7 @@ import {
     LiveBroadcastsListResponse,
 } from "../../model/youtube/liveBroadcast";
 
-const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3';
+import { platformApiUrl } from "../../relay";
 
 export const youtubeLiveBroadcastApi = {
 
@@ -15,10 +15,11 @@ export const youtubeLiveBroadcastApi = {
         accessToken: string,
         data: LiveBroadcastsListRequest,
         signal?: AbortSignal,
+        apiBaseUrl?: string,
     ): Promise<LiveBroadcastsListResponse> => {
         const params = new URLSearchParams({ part: 'snippet', mine: String(data.mine) });
         return httpClient.get(
-            `${YOUTUBE_API_BASE_URL}/liveBroadcasts?${params.toString()}`,
+            platformApiUrl('youtube', `/youtube/v3/liveBroadcasts?${params.toString()}`, apiBaseUrl),
             (data) => data as LiveBroadcastsListResponse,
             {
                 signal,

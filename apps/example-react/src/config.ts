@@ -3,10 +3,8 @@ const apiBaseUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, '') ||
     ? 'https://api.galashow.cloud'
     : 'https://api-dev.galashow.cloud');
 
-// Vite's proxy exists only while serving locally, never in static builds.
-export const CHZZK_API_BASE_URL = import.meta.env.DEV
-  ? '/api/chzzk'
-  : `${apiBaseUrl}/chzzk`;
-
-export const YOUTUBE_STREAM_URL = import.meta.env.VITE_YOUTUBE_STREAM_URL?.trim() ||
-  (import.meta.env.DEV ? '/api/youtube/chat/stream' : `${apiBaseUrl}/youtube/chat/stream`);
+export const RELAY_API_BASE_URL = import.meta.env.DEV ? '/api' : apiBaseUrl;
+export const CHZZK_API_BASE_URL = `${RELAY_API_BASE_URL}/chzzk`;
+export const SOOP_API_BASE_URL = `${RELAY_API_BASE_URL}/soop`;
+export const YOUTUBE_API_BASE_URL = `${RELAY_API_BASE_URL}/youtube`;
+export const YOUTUBE_STREAM_URL = import.meta.env.VITE_YOUTUBE_STREAM_URL?.trim() || `${YOUTUBE_API_BASE_URL}/chat/stream`;

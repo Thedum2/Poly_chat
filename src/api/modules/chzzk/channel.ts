@@ -1,17 +1,18 @@
-﻿import { httpClient } from "../../httpClient";
+import { platformApiUrl } from '../../relay';
+import { httpClient } from "../../httpClient";
 import {GetChannelInfoResponse, GetUserInfoResponse} from "../../model/chzzk/channel";
 import {chzzkAuthStore} from "../../../store/chzzkAuthStore";
 
-const getChzzkApiUrl = () => chzzkAuthStore.getState().apiBaseUrl;
+const getChzzkApiUrl = (base?: string) => platformApiUrl('chzzk', '', base).replace(/\/$/, '');
 
 export const chzzkChannelApi = {
 
     //======================
     // 치지직 사용자 정보 가져오기
     //======================
-    getUserInfo: async (): Promise<GetUserInfoResponse> => {
+    getUserInfo: async (apiBaseUrl?: string): Promise<GetUserInfoResponse> => {
         return httpClient.get(
-            `${getChzzkApiUrl()}/users/me`,
+            `${getChzzkApiUrl(apiBaseUrl)}/open/v1/users/me`,
             (data) => data as any,
             {
                 headers: {
@@ -25,9 +26,9 @@ export const chzzkChannelApi = {
     //======================
     // 6. 치지직 채널 정보 가져오기
     //======================
-    getChannelInfo: async (channelIds: string): Promise<GetChannelInfoResponse> => {
+    getChannelInfo: async (channelIds: string, _credentials?: { clientId: string; clientSecret?: string }, apiBaseUrl?: string): Promise<GetChannelInfoResponse> => {
         return httpClient.get(
-            `${getChzzkApiUrl()}/channels?channelIds=${encodeURIComponent(channelIds)}`,
+            `${getChzzkApiUrl(apiBaseUrl)}/open/v1/channels?channelIds=${encodeURIComponent(channelIds)}`,
             (data) => data as any,
             {
                 headers: {

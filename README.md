@@ -39,8 +39,8 @@ yarn add polychat-bridge
 각 플랫폼에서 OAuth 클라이언트를 생성해야 합니다:
 
 ### CHZZK
-1. [CHZZK 개발자 센터](https://developers.naver.com/apps/#/register)에서 애플리케이션 등록
-2. OAuth 2.0 클라이언트 ID와 Secret을 서버에 설정 (브라우저에는 공개 ID만 제공)
+1. [CHZZK 개발자 센터](https://developers.chzzk.naver.com)에서 애플리케이션 등록
+2. OAuth 2.0 클라이언트 ID와 Secret을 발급받아 샘플 설정 화면에서 직접 입력
 3. Redirect URI 설정 (예: `http://localhost:3000/callback`)
 
 ### SOOP
@@ -89,7 +89,7 @@ npm run build:prod --workspace=polychat-example-react
 
 데모 빌드 결과는 `apps/example-react/dist/`다. 공개 환경 파일 `.env.development`와 `.env.production`의 API 기본값은 각각 `https://api-dev.galashow.cloud`, `https://api.galashow.cloud`다. 개인 설정은 무시되는 `apps/example-react/.env.development.local` 또는 `.env.production.local`의 `VITE_API_URL`로 덮어쓴다. 빈 값은 모드의 기본값을 사용한다.
 
-로컬 `npm run demo`는 Vite의 `/api/chzzk` 프록시를 GalaShow API의 `/chzzk`로 연결한다. 정적 빌드는 선택한 API의 `/chzzk`로 요청한다. API는 해당 웹 origin에 대한 CORS를 허용해야 한다.
+CHZZK는 모든 모드에서 `https://openapi.chzzk.naver.com`을 직접 호출한다. GalaShow API와 Vite 프록시를 사용하지 않는다. `VITE_API_URL`은 CHZZK 요청에 영향을 주지 않는다.
 
 CHZZK와 YouTube의 기본 콜백은 현재 브라우저 origin의 `/callback`이다. 제공자 콘솔에 실제 사용하는 주소를 등록한다.
 
@@ -117,12 +117,17 @@ npm 게시는 Actions 수동 실행에서 `publish=true`를 선택할 때만 수
 
 ### CHZZK
 CHZZK는 OAuth 2.0 인증을 사용하며, WebSocket을 통해 실시간 채팅 메시지를 수신합니다.
-https://developers.chzzk.naver.com 에서 클라이언트 ID / 클라이언트 Secret / 로그인 리디렉션 URL을 발급받고, ID와 Secret은 GalaShow API 서버에 설정하세요. 브라우저는 `/chzzk/config`에서 공개 ID를 받습니다.
+[CHZZK 개발자 센터](https://developers.chzzk.naver.com)에서 클라이언트 ID / 클라이언트 Secret / 로그인 리디렉션 URL을 발급받아 샘플 설정 화면에 입력합니다. ID는 `init()`에, Secret은 `authenticate()`에 한 번 전달합니다. 샘플은 입력값을 React 메모리에만 보관하며 브라우저 저장소에 저장하지 않습니다. CHZZK Secret을 `VITE_*`나 공개 환경 파일에 넣지 마세요. 브라우저에 입력한 Secret은 해당 페이지와 개발자 도구에서 접근할 수 있습니다.
 
 **필수 정보:**
-- `apiBaseUrl`: GalaShow API의 `/chzzk`까지 포함한 주소
+- `clientId`: CHZZK 클라이언트 ID (`init`)
+- `clientSecret`: CHZZK 클라이언트 Secret (`authenticate`)
 - `redirectUri`: OAuth 콜백 URL (예: `http://localhost:3000/callback`)
 - API Scope는 채팅 메시지 조회, 후원 조회, 구독 조회입니다.(developer에서 설정 가능)
+
+직접 HTTP 호출은 [공식 인증 명세](https://chzzk.gitbook.io/chzzk/chzzk-api/authorization)에 따라 `/auth/v1/token`의 `grantType`, `clientId`, `clientSecret`을 사용합니다. 사용자 조회는 Bearer 토큰, 채널 조회는 `Client-Id`/`Client-Secret` 헤더를 사용합니다. [사용자 세션](https://chzzk.gitbook.io/chzzk/chzzk-api/session)은 `GET /open/v1/sessions/auth`로 생성하며 이벤트 구독의 `sessionKey`는 쿼리로 전달합니다.
+
+**현재 브라우저 제한:** 2026-09-29 확인 결과, 개발 웹(`https://dev.galashow.cloud`)과 로컬(`http://localhost:5173`) origin의 토큰·사용자·세션 API OPTIONS 요청은 모두 `403 Invalid CORS request`이며 허용 origin 헤더가 없습니다. 따라서 현재 정책에서는 직접 호출하는 브라우저 OAuth 토큰 발급과 후속 연결이 완료되지 않습니다. 프록시나 CORS 우회는 구현하지 않습니다. 테스트는 가짜 자격증명과 로컬 HTTP 전송 대체로 요청 계약을 검증하며 실제 인증 성공을 뜻하지 않습니다.
 
 ### SOOP
 SOOP는 OAuth 인증과 자체 Chat SDK를 사용합니다.
@@ -170,7 +175,7 @@ VITE_SOOP_CLIENT_SECRET=your_soop_client_secret
 VITE_YOUTUBE_CLIENT_ID=your_youtube_client_id
 ```
 
-`VITE_*` 값은 브라우저 번들에 공개된다. 기존 데모의 플랫폼 Secret 입력 방식은 그대로이며 비밀 값을 공개 환경 파일이나 저장소에 추가하지 않는다. 실제 서비스의 Secret 관리는 서버에서 처리해야 한다.
+`VITE_*` 값은 브라우저 번들에 공개된다. 기존 데모의 플랫폼 Secret 입력 방식은 그대로이며 비밀 값을 공개 환경 파일이나 저장소에 추가하지 않는다. CHZZK 샘플은 수동 입력값만 사용하며 브라우저 직접 호출의 CORS 제한은 위 CHZZK 절을 따른다.
 
 ## 메시지 형식
 
@@ -216,8 +221,8 @@ import { ChzzkAdapter } from 'polychat-bridge';
 const adapter = new ChzzkAdapter();
 
 await adapter.init({
-  redirectUri: 'YOUR_REDIRECT_URI',
-  apiBaseUrl: 'https://api-dev.galashow.cloud/chzzk'
+  clientId: 'YOUR_CLIENT_ID',
+  redirectUri: 'YOUR_REDIRECT_URI'
 });
 ```
 
@@ -261,7 +266,7 @@ await adapter.init({
 #### CHZZK
 
 ```typescript
-await adapter.authenticate({});
+await adapter.authenticate({ clientSecret: 'MANUALLY_ENTERED_CLIENT_SECRET' });
 ```
 
 #### SOOP
@@ -497,12 +502,12 @@ polyChat.on('disconnected', ({ platform }) => {
 });
 
 // 초기화
-await chzzk.init({ redirectUri: '...', apiBaseUrl: 'https://api-dev.galashow.cloud/chzzk' });
+await chzzk.init({ clientId: '...', redirectUri: '...' });
 await soop.init({ clientId: '...', clientSecret: '...' });
 await youtube.init({ clientId: '...', redirectUri: '...', streamUrl: '/api/youtube/chat/stream' });
 
 // 인증
-await chzzk.authenticate({});
+await chzzk.authenticate({ clientSecret: '...' });
 await soop.authenticate({ clientId: '...', clientSecret: '...' });
 await youtube.authenticate({});
 

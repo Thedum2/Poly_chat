@@ -7,6 +7,7 @@ interface Props {
   onToggle: (platform: Platform) => void;
   onUpdateConfig: (platform: Platform, key: keyof PlatformConfig, value: string | number) => void;
   onConfigure: () => void;
+  relayError?: string;
 }
 
 export default function SetupView({
@@ -15,6 +16,7 @@ export default function SetupView({
   onToggle,
   onUpdateConfig,
   onConfigure,
+  relayError,
 }: Props) {
   return (
     <div className="setup-layout">
@@ -70,6 +72,7 @@ export default function SetupView({
               <Icon name="plug" size={21} />
             </span>
           </div>
+          {relayError && <p role="alert">{relayError}</p>}
           {selectedPlatforms.size === 0 ? (
             <div className="configuration-empty">
               <span className="empty-plug">
@@ -88,7 +91,7 @@ export default function SetupView({
                     <span>연결 설정</span>
                   </div>
                   <div className="config-fields">
-                    {platform !== 'chzzk' && <div className="form-field">
+                    <div className="form-field">
                       <label htmlFor={`${platform}-client-id`}>Client ID</label>
                       <input
                         id={`${platform}-client-id`}
@@ -99,20 +102,7 @@ export default function SetupView({
                         autoComplete="off"
                         spellCheck={false}
                       />
-                    </div>}
-                    {platform === 'soop' && (
-                      <div className="form-field">
-                        <label htmlFor={`${platform}-client-secret`}>Client Secret</label>
-                        <input
-                          id={`${platform}-client-secret`}
-                          type="password"
-                          value={configs[platform].clientSecret}
-                          onChange={(e) => onUpdateConfig(platform, 'clientSecret', e.target.value)}
-                          placeholder="발급받은 Client Secret"
-                          autoComplete="off"
-                        />
-                      </div>
-                    )}
+                    </div>
                     {platform !== 'soop' && (
                       <div className={`form-field ${platform === 'chzzk' ? 'full-width' : ''}`}>
                         <label htmlFor={`${platform}-redirect`}>Redirect URI</label>
