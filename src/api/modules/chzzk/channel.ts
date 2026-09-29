@@ -1,6 +1,6 @@
 import { platformApiUrl } from '../../relay';
 import { httpClient } from "../../httpClient";
-import {GetChannelInfoResponse, GetUserInfoResponse} from "../../model/chzzk/channel";
+import {GetChannelInfoResponse, GetLiveStatusResponse, GetUserInfoResponse} from "../../model/chzzk/channel";
 import {chzzkAuthStore} from "../../../store/chzzkAuthStore";
 
 const getChzzkApiUrl = (base?: string) => platformApiUrl('chzzk', '', base).replace(/\/$/, '');
@@ -36,6 +36,17 @@ export const chzzkChannelApi = {
                     'Accept': 'application/json'
                 }
             }
+        );
+    },
+
+    //======================
+    // 치지직 방송 상태 (비공식 API, 중계 서버 경유)
+    //======================
+    getLiveStatus: async (channelId: string, apiBaseUrl?: string): Promise<GetLiveStatusResponse> => {
+        return httpClient.get(
+            `${getChzzkApiUrl(apiBaseUrl)}/live-status?channelId=${encodeURIComponent(channelId)}`,
+            (data) => data as any,
+            { headers: { 'Accept': 'application/json' } }
         );
     }
 };

@@ -404,3 +404,23 @@ test('YouTube stream delegation shares origin and method checks without consumin
   assert.match(await response.text(), /event: ready/);
   assert.equal(calls, 1);
 });
+
+test('CHZZK live status is forwarded to the service API only for valid channel IDs', async t => {
+  const seen: string[] = [];
+  const service = await listen(t, createServer((req, res) => {
+    seen.push(req.url!);
+    assert.equal(req.headers.authorization, undefined);
+    res.end(JSON.stringify({ code: 200, content: { status: 'OPEN' } }));
+  }));
+  const { base } = await setup(t, undefined, { chzzkLiveStatusUpstream: service });
+  const channelId = 'cf3af0be12fa6912436c4d29331af342';
+  const response = await fetch(`${base}/chzzk/live-status?channelId=${channelId}`, { headers: bearer });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).content.status, 'OPEN');
+  assert.deepEqual(seen, [`/polling/v2/channels/${channelId}/live-status`]);
+  for (const bad of ['../../etc', 'abc', `${channelId}x`]) {
+    const rejected = await fetch(`${base}/chzzk/live-status?channelId=${encodeURIComponent(bad)}`);
+    assert.equal(rejected.status, 400);
+  }
+  assert.equal(seen.length, 1);
+});

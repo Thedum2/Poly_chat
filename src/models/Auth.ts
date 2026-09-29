@@ -6,6 +6,8 @@ export interface InitOptions{
 export interface ChzzkInitOptions extends InitOptions{
     clientId: string;
     redirectUri: string;
+    /** When true, connect() fails unless the channel is live (unofficial CHZZK live-status API via the relay). */
+    requireLive?: boolean;
 }
 
 export interface SoopInitOptions extends InitOptions{
@@ -19,6 +21,8 @@ export interface YouTubeInitOptions extends InitOptions{
     redirectUri: string;
     /** SSE relay endpoint. Defaults to /api/youtube/chat/stream. */
     streamUrl?: string;
+    /** When true, connect() only uses a broadcast that is currently live (broadcastStatus=active). */
+    requireLive?: boolean;
     /** @deprecated Chat uses streamList; this option is ignored. */
     pollingIntervalSeconds?: number;
 }

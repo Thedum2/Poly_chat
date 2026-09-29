@@ -21,6 +21,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
     private authPopup: Window | null = null;
     private state: string = '';
     private apiBaseUrl = '/api/youtube';
+    private requireLive = false;
     private streamUrl = '/api/youtube/chat/stream';
     private streamController: AbortController | null = null;
     private logger = createLogger('[YouTube]');
@@ -44,6 +45,7 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
 
         this.clientId = options.clientId;
         this.redirectUri = options.redirectUri;
+        this.requireLive = options.requireLive ?? false;
 
         this.apiBaseUrl = platformApiUrl('youtube', '', options.apiBaseUrl).replace(/\/$/, '');
         this.streamUrl = options.streamUrl?.trim() || platformApiUrl('youtube', '/chat/stream', this.apiBaseUrl);
@@ -209,7 +211,9 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
         try {
             const accessToken = youtubeAuthStore.getState().accessToken;
             if (!accessToken) throw new Error('No access token available');
-            const broadcasts = await youtubeLiveBroadcastApi.listLiveBroadcasts(accessToken, {mine: true}, signal, this.apiBaseUrl);
+            // mine=true also returns upcoming broadcasts, whose chat exists before going live.
+            const filter = this.requireLive ? {broadcastStatus: 'active' as const} : {mine: true};
+            const broadcasts = await youtubeLiveBroadcastApi.listLiveBroadcasts(accessToken, filter, signal, this.apiBaseUrl);
             if (signal.aborted) return;
             const liveChatId = broadcasts.items.find(item => item.snippet.liveChatId)?.snippet.liveChatId;
             if (!liveChatId) throw new Error('라이브 채팅을 찾을 수 없습니다. 라이브 스트리밍을 시작한 후 다시 시도해주세요.');

@@ -11,7 +11,7 @@ const adapterCode = ts.transpileModule(readFileSync(adapterFile, 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
 }).outputText;
 
-async function setup(t: TestContext, failures: Record<string, number> = {}) {
+async function setup(t: TestContext, failures: Record<string, number> = {}, live?: { status?: string; fail?: boolean }) {
   for (const level of ['log', 'debug', 'warn', 'error'] as const) t.mock.method(console, level, () => {});
   const handlers = new Map<string, (...args: any[]) => any>();
   let disconnected = false;
@@ -37,6 +37,12 @@ async function setup(t: TestContext, failures: Record<string, number> = {}) {
   t.mock.method(chzzkChannelApi, 'getUserInfo', async () => ({ content: { channelId: 'test-channel' } }));
   t.mock.method(chzzkChannelApi, 'getChannelInfo', async () => ({ content: { data: [] } }));
   t.mock.method(chzzkSessionApi, 'createClientSession', async () => ({ content: { url: 'https://example.invalid' } }));
+  const liveChecks: string[] = [];
+  t.mock.method(chzzkChannelApi, 'getLiveStatus', async (channelId: string) => {
+    liveChecks.push(channelId);
+    if (live?.fail) throw Object.assign(new Error('lookup failed'), { response: { status: 502 } });
+    return { code: 200, content: { status: live?.status ?? 'OPEN' } };
+  });
   const requests: string[] = [];
   for (const [method, event] of [
     ['subscribeToChat', 'chat'],
@@ -54,6 +60,7 @@ async function setup(t: TestContext, failures: Record<string, number> = {}) {
   (adapter as any).clientId = 'test-client-id';
   (adapter as any).code = 'test-code';
   (adapter as any).state = 'test-state';
+  (adapter as any).requireLive = live !== undefined;
   const errors: Error[] = [];
   let connectedEvents = 0;
   let disconnectedEvents = 0;
@@ -61,9 +68,10 @@ async function setup(t: TestContext, failures: Record<string, number> = {}) {
   adapter.on('connected', () => connectedEvents++);
   adapter.on('disconnected', () => disconnectedEvents++);
   await adapter.authenticate({ clientSecret: 'test-secret' });
-  await adapter.connect();
+  let connectError: Error | undefined;
+  await adapter.connect().catch((error: Error) => { connectError = error; });
   return {
-    adapter, requests, errors,
+    adapter, requests, errors, liveChecks, connectError,
     isDisconnected: () => disconnected,
     connectedEvents: () => connectedEvents,
     disconnectedEvents: () => disconnectedEvents,
@@ -121,4 +129,31 @@ test('CHZZK notifies consumers when resubscription disconnects an established co
   assert.equal(state.adapter.isConnected, false);
   assert.equal(state.disconnectedEvents(), 1);
   assert.equal(state.errors.length, 1);
+});
+
+test('CHZZK requireLive connects only while the channel is live', async (t) => {
+  const state = await setup(t, {}, { status: 'OPEN' });
+  assert.equal(state.connectError, undefined);
+  assert.deepEqual(state.liveChecks, ['test-channel']);
+  await state.onSessionConnected();
+  assert.equal(state.adapter.isConnected, true);
+});
+
+test('CHZZK requireLive rejects offline channels before opening a chat session', async (t) => {
+  const state = await setup(t, {}, { status: 'CLOSE' });
+  assert.match(state.connectError?.message ?? '', /방송 중이 아닙니다/);
+  assert.equal(state.adapter.isConnected, false);
+  assert.deepEqual(state.requests, []);
+});
+
+test('CHZZK requireLive fails closed when the live status cannot be read', async (t) => {
+  const state = await setup(t, {}, { fail: true });
+  assert.match(state.connectError?.message ?? '', /방송 상태를 확인하지 못했습니다/);
+  assert.equal(state.adapter.isConnected, false);
+});
+
+test('CHZZK skips the live check unless requireLive is set', async (t) => {
+  const state = await setup(t);
+  assert.equal(state.connectError, undefined);
+  assert.deepEqual(state.liveChecks, []);
 });

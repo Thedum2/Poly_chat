@@ -21,3 +21,11 @@ export interface GetChannelInfoResponse {
         }>;
     };
 }
+
+export interface GetLiveStatusResponse {
+    code: number;
+    content: {
+        /** 'OPEN' while live, 'CLOSE' otherwise */
+        status: string;
+    } | null;
+}

@@ -27,6 +27,8 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
     private code: string = '';
     private clientId: string = '';
     private apiBaseUrl = '/api/chzzk';
+    private requireLive = false;
+    private channelId = '';
     private authPopup: Window | null = null;
     private state: string = '';
     private logger = createLogger('[CHZZK]');
@@ -67,6 +69,8 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         if (!options.clientId.trim()) throw new Error('CHZZK clientId is required');
         this.apiBaseUrl = platformApiUrl('chzzk', '', options.apiBaseUrl).replace(/\/$/, '');
         this.clientId = options.clientId;
+        this.requireLive = options.requireLive ?? false;
+        this.channelId = '';
         this.code = '';
         this.state = '';
         chzzkAuthStore.getState().clearTokens();
@@ -168,6 +172,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
 
             try {
                 const userInfo = await chzzkChannelApi.getUserInfo(this.apiBaseUrl);
+                this.channelId = userInfo.content.channelId;
                 const channelInfo = await chzzkChannelApi.getChannelInfo(userInfo.content.channelId, undefined, this.apiBaseUrl);
 
                 if (channelInfo.content.data.length > 0) {
@@ -198,6 +203,18 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         }
     }
 
+    private async ensureLive(): Promise<void> {
+        let status: string | undefined;
+        try {
+            if (!this.channelId) this.channelId = (await chzzkChannelApi.getUserInfo(this.apiBaseUrl)).content.channelId;
+            status = (await chzzkChannelApi.getLiveStatus(this.channelId, this.apiBaseUrl)).content?.status;
+        } catch (error) {
+            this.logger.warn('Live status lookup failed:', safeChzzkError(error));
+            throw new Error('방송 상태를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.');
+        }
+        if (status !== 'OPEN') throw new Error('방송 중이 아닙니다. 방송을 시작한 후 다시 시도해주세요.');
+    }
+
     async connect(): Promise<void> {
         if (!this._isAuthenticated) {
             throw new Error('Authentication is required before connecting.');
@@ -206,6 +223,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         this._isConnected = false;
 
         try {
+            if (this.requireLive) await this.ensureLive();
             const sessionResponse = await chzzkSessionApi.createClientSession(this.apiBaseUrl);
             this.opts.url = sessionResponse.content.url;
 

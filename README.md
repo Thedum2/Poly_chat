@@ -323,6 +323,17 @@ adapter.on('error', (error: Error) => {
 await adapter.connect();
 ```
 
+#### 방송 중일 때만 연결 (`requireLive`)
+
+CHZZK·YouTube는 `init({ ..., requireLive: true })`로 방송 중이 아니면 `connect()`가 오류로 거절하게 할 수 있습니다. 기본값은 `false`로 기존 동작과 같습니다. SOOP은 옵션과 관계없이 채팅 SDK가 방송 전 연결을 `There are no streams currently in progress.(104)`로 거절합니다.
+
+| 플랫폼 | 확인 방법 | 방송 전 오류 |
+| --- | --- | --- |
+| CHZZK | 중계 서버 `GET /chzzk/live-status?channelId=`가 **비공식** `api.chzzk.naver.com/polling/v2/channels/{id}/live-status`를 조회해 `status === 'OPEN'`인지 확인 (공식 Open API에 채널별 방송 상태가 없음) | `방송 중이 아닙니다…`, 조회 실패 시 `방송 상태를 확인하지 못했습니다…` (fail closed) |
+| YouTube | 방송 목록을 `mine=true` 대신 `broadcastStatus=active`로 조회 (예약 방송의 채팅 ID를 쓰지 않음) | `라이브 채팅을 찾을 수 없습니다…` |
+
+CHZZK 비공식 API는 예고 없이 바뀔 수 있습니다. 중계 서버의 조회 대상은 `chzzkLiveStatusUpstream` 옵션(기본 `https://api.chzzk.naver.com`)이며, `channelId`는 32자리 16진수만 허용합니다.
+
 ### 연결 해제 (disconnect)
 
 채팅 연결을 종료합니다.

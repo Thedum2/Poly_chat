@@ -17,7 +17,9 @@ export const youtubeLiveBroadcastApi = {
         signal?: AbortSignal,
         apiBaseUrl?: string,
     ): Promise<LiveBroadcastsListResponse> => {
-        const params = new URLSearchParams({ part: 'snippet', mine: String(data.mine) });
+        const params = new URLSearchParams({ part: 'snippet' });
+        if ('broadcastStatus' in data) params.set('broadcastStatus', data.broadcastStatus);
+        else params.set('mine', String(data.mine));
         return httpClient.get(
             platformApiUrl('youtube', `/youtube/v3/liveBroadcasts?${params.toString()}`, apiBaseUrl),
             (data) => data as LiveBroadcastsListResponse,

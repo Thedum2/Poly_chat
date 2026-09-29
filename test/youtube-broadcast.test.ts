@@ -21,3 +21,15 @@ test('broadcast lookup requests the snippet containing liveChatId', async (t) =>
     'YouTube requires part to return the chat ID'
   );
 });
+
+test('broadcast lookup can request only live broadcasts', async (t) => {
+  let requestUrl = '';
+  t.mock.method(httpClient, 'get', async (url: string) => {
+    requestUrl = url;
+    return { items: [] };
+  });
+  await youtubeLiveBroadcastApi.listLiveBroadcasts('test-token', { broadcastStatus: 'active' });
+  const url = new URL(requestUrl, 'http://localhost');
+  assert.equal(url.searchParams.get('broadcastStatus'), 'active');
+  assert.equal(url.searchParams.has('mine'), false, 'YouTube rejects mine combined with broadcastStatus');
+});

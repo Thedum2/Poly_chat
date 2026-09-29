@@ -11,6 +11,8 @@ export interface ApiRelayOptions {
   timeoutMs?: number;
   /** Trusted server configuration only, primarily for local integration tests. */
   sdkUrl?: string;
+  /** CHZZK service API origin for the unofficial live-status lookup. Trusted server configuration only. */
+  chzzkLiveStatusUpstream?: string;
   /** Optional existing streaming transport, mounted behind the same origin checks. */
   youtubeStreamHandler?: (req: IncomingMessage, res: ServerResponse) => void;
 }
@@ -28,6 +30,8 @@ const ROUTES: Record<Provider, Record<string, Route>> = {
     '/open/v1/users/me': { method: 'GET', query: [], bearer: true },
     '/open/v1/channels': { method: 'GET', query: ['channelIds'], bearer: true, credentials: true },
     '/open/v1/sessions/auth': { method: 'GET', query: [], bearer: true },
+    // Unofficial service API (no Open API equivalent); forwarded to chzzkLiveStatusUpstream.
+    '/live-status': { method: 'GET', query: ['channelId'] },
     ...Object.fromEntries(['subscribe', 'unsubscribe'].flatMap(action => ['chat', 'donation', 'subscription'].map(event => [
       `/open/v1/sessions/events/${action}/${event}`, { method: 'POST', query: ['sessionKey'], bearer: true },
     ]))),
@@ -195,6 +199,7 @@ export function createApiRelayHandler(options: ApiRelayOptions = {}): (req: Inco
   const credentials = options.credentials ?? {};
   const configuredSecrets = [credentials.chzzk?.clientSecret, credentials.soop?.clientSecret].filter((value): value is string => Boolean(value));
   let sdkCache: { expires: number; source: string } | undefined;
+  const chzzkLiveStatusUpstream = parseOrigin(options.chzzkLiveStatusUpstream ?? 'https://api.chzzk.naver.com');
 
   return (req, res): void => {
     const controller = new AbortController();
@@ -279,7 +284,12 @@ export function createApiRelayHandler(options: ApiRelayOptions = {}): (req: Inco
         headers['Client-Secret'] = credential!.clientSecret;
       }
       if (route.query.includes('sessionKey')) secrets.push(textField(Object.fromEntries(url.searchParams), 'sessionKey'));
-      const destination = sdk ? sdkUrl : new URL(path + url.search, upstreams[provider!]);
+      let destination = sdk ? sdkUrl : new URL(path + url.search, upstreams[provider!]);
+      if (provider === 'chzzk' && path === '/live-status') {
+        const channelId = url.searchParams.get('channelId') ?? '';
+        if (!/^[0-9a-f]{32}$/i.test(channelId)) throw new RelayError(400, 'A valid channelId is required.');
+        destination = new URL(`/polling/v2/channels/${channelId}/live-status`, chzzkLiveStatusUpstream);
+      }
       const response = await fetch(destination, { method: route.method, headers: sdk ? { Accept: 'application/javascript' } : headers, body: requestBody, signal: controller.signal, redirect: 'manual', credentials: 'omit' });
       if (response.status >= 300 && response.status < 400) {
         await response.body?.cancel();

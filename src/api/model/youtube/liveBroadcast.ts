@@ -1,6 +1,7 @@
-export interface LiveBroadcastsListRequest {
-    mine: boolean;
-}
+/** YouTube accepts exactly one filter: mine or broadcastStatus (the latter implies the caller's broadcasts). */
+export type LiveBroadcastsListRequest =
+    | { mine: boolean }
+    | { broadcastStatus: 'active' | 'all' | 'completed' | 'upcoming' };
 
 export interface LiveBroadcast {
     kind: string;
