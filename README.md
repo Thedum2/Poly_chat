@@ -99,21 +99,21 @@ CHZZK와 YouTube의 기본 콜백은 현재 브라우저 origin의 `/callback`�
 | 운영 웹 | `https://galashow.cloud/callback` | `https://galashow.cloud` |
 | 로컬 데모 | `http://localhost:3000/callback` | `http://localhost:3000` |
 
-#### S3 정적 호스팅
+#### S3 정적 호스팅과 중계 서버
 
-`infra/demo-web.json`은 환경별 비공개 S3 버킷, OAC CloudFront, `/callback` 등 경로를 `index.html`로 연결하는 CloudFront Function과 Route 53 레코드를 만든다. 인증서는 GalaShow `galashow-cloud-certificate` 스택의 와일드카드 인증서를 사용한다.
+https://polychat.galashow.cloud 는 `infra/demo-web.json` 스택(`polychat-demo-dev`)으로 운영한다.
 
-| 환경 | 스택 | 주소 |
-| --- | --- | --- |
-| 개발 | `polychat-demo-dev` | https://polychat-dev.galashow.cloud |
-| 운영 | `polychat-demo-prod` | https://polychat.galashow.cloud (미배포) |
+- 데모: 비공개 S3 버킷, OAC CloudFront, `/callback` 등 경로를 `index.html`로 연결하는 CloudFront Function, Route 53 레코드. 인증서는 GalaShow `galashow-cloud-certificate`의 와일드카드 인증서를 사용한다.
+- 중계: `polychat-relay`를 [Lambda Web Adapter](https://github.com/awslabs/aws-lambda-web-adapter)로 감싼 Lambda(`polychat-relay-dev`)와 응답 스트리밍 Function URL. CloudFront가 같은 도메인의 `/api/*`를 `/api`를 뗀 경로로 전달하므로 데모는 `VITE_API_URL=/api`로 빌드한다. Authorization 헤더는 캐시 키에 넣어 전달하며 응답은 캐시하지 않는다. 허용 origin은 데모 도메인 하나다.
+- 자격증명: 배포 스크립트가 무시되는 루트 `.env.local`의 CHZZK/SOOP/YouTube 값을 NoEcho 파라미터로 Lambda 환경변수에 넣는다. 값이 없으면 스택의 이전 값을 유지한다.
+- 제약: Lambda 최대 실행 15분마다 YouTube SSE 연결이 끊기며 어댑터가 커서를 유지해 재연결한다. CloudFront 원본 읽기 제한 60초보다 짧은 15초 heartbeat가 필요하다.
 
 ```powershell
 aws login --profile galashow --region ap-northeast-2
-./infra/deploy-demo.ps1 -Stage dev   # 스택 갱신, 라이브러리·데모 빌드, S3 동기화, CloudFront 무효화
+./infra/deploy-demo.ps1 -Stage dev   # 라이브러리·데모 빌드, 중계 패키징·업로드, 스택 갱신, S3 동기화, CloudFront 무효화
 ```
 
-`-SkipInfra`는 스택 갱신을, `-SkipBuild`는 빌드를 생략한다. `assets/`는 1년 불변 캐시, 나머지는 `no-cache`로 올린다. 데모는 `VITE_API_URL`을 중계 서버 주소로 사용하므로 해당 주소에 `polychat-relay`가 없으면 페이지는 열리지만 연결 설정을 불러오지 못한다. 현재 GalaShow API(`api-dev.galashow.cloud`)는 중계 경로를 제공하지 않는다. 플랫폼 콘솔에는 `https://polychat-dev.galashow.cloud/callback`을 별도로 등록해야 한다.
+`-SkipInfra`는 중계 패키징과 스택 갱신을, `-SkipBuild`는 빌드를 생략한다. `assets/`는 1년 불변 캐시, 나머지는 `no-cache`로 올린다. 공급자 콘솔에는 `https://polychat.galashow.cloud/callback`을 등록해야 실제 로그인이 완료된다.
 
 다른 origin에 데모를 배포하면 해당 주소로 등록한다. 정적 호스팅은 `/callback`을 `index.html`로 제공해야 한다. 제공자 등록과 실제 로그인 성공은 별도로 검증한다.
 
