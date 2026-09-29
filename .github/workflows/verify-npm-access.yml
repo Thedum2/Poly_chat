@@ -27,6 +27,13 @@ jobs:
             exit 1
           fi
           if ! username=$(npm whoami --registry=https://registry.npmjs.org --silent 2>/dev/null); then
+            node -e '
+              fetch("https://registry.npmjs.org/-/whoami", {
+                headers: { Authorization: `Bearer ${process.env.NODE_AUTH_TOKEN}` },
+                signal: AbortSignal.timeout(10000),
+              }).then(response => console.log(`npm authentication HTTP status: ${response.status}`))
+                .catch(() => console.log("npm authentication HTTP request failed."));
+            '
             echo '::error::NPM_TOKEN could not authenticate with the npm registry.'
             exit 1
           fi
