@@ -18,10 +18,7 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
     readonly platform = 'chzzk';
     private _isAuthenticated = false;
     private _isConnected = false;
-    private clientId: string = '';
     private code: string = '';
-    private clientSecret: string = '';
-    private redirectUri: string = '';
     private authPopup: Window | null = null;
     private state: string = '';
     private logger = createLogger('[CHZZK]');
@@ -47,6 +44,11 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
             throw new Error('Chzzk adapter requires browser environment');
         }
 
+        const callback = new URL(options.redirectUri, window.location.origin);
+        if (callback.origin !== window.location.origin || !callback.pathname) {
+            throw new Error('CHZZK callback origin must match the current page origin');
+        }
+
         this._isAuthenticated = false;
         this._isConnected = false;
         try {
@@ -54,54 +56,44 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         } catch {
         }
 
-        this.clientId = options.clientId;
-        this.clientSecret = options.clientSecret;
-        this.redirectUri = options.redirectUri;
-
         if (options.apiBaseUrl) {
             chzzkAuthStore.getState().setApiBaseUrl(options.apiBaseUrl);
         }
 
+        // Open while still in the click handler; browsers block popups opened after a fetch.
+        this.authPopup = window.open('about:blank', 'Chzzk OAuth', 'width=500,height=700,left=100,top=100');
+        if (!this.authPopup) throw new Error('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.');
+
         try {
-            this.code = await this.openAuthPopup();
+            const config = await chzzkAuthApi.getConfig();
+            if (!config.content?.clientId) throw new Error('CHZZK public client ID is unavailable');
+            this.state = uuidv4();
+            this.authPopup.location.href = chzzkAuthApi.getAuthCodeUrl({
+                clientId: config.content.clientId,
+                redirectUri: callback.href,
+                state: this.state,
+            });
+            this.code = await this.waitForAuthCallback(callback);
             this.logger.info('OAuth code received');
             this.emit('initialized');
             return;
         } catch (error) {
+            this.code = '';
+            this.state = '';
+            if (this.authPopup && !this.authPopup.closed) this.authPopup.close();
+            this.authPopup = null;
             this.logger.error('OAuth popup failed:', error);
             this.emit('error', error);
             throw error;
         }
     }
 
-    private openAuthPopup(): Promise<string> {
+    private waitForAuthCallback(callback: URL): Promise<string> {
         return new Promise((resolve, reject) => {
-            this.state = uuidv4();
-            const authUrl = chzzkAuthApi.getAuthCodeUrl({
-                clientId: this.clientId,
-                redirectUri: this.redirectUri,
-                state: this.state,
-            });
-
-            this.authPopup = window.open(
-                authUrl,
-                'Chzzk OAuth',
-                'width=500,height=700,left=100,top=100'
-            );
-
-            if (!this.authPopup) {
-                reject(new Error('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.'));
-                return;
-            }
-
-            let isResolved = false;
-
             const checkPopupUrl = setInterval(() => {
                 if (this.authPopup && this.authPopup.closed) {
-                    if (!isResolved) {
-                        cleanup();
-                        reject(new Error('사용자가 OAuth 팝업을 닫았습니다.'));
-                    }
+                    cleanup();
+                    reject(new Error('사용자가 OAuth 팝업을 닫았습니다.'));
                     return;
                 }
 
@@ -109,14 +101,25 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                     const popupUrl = this.authPopup?.location.href;
                     if (popupUrl) {
                         const url = new URL(popupUrl);
+                        if (url.origin !== callback.origin || url.pathname !== callback.pathname) return;
+                        const error = url.searchParams.get('error');
                         const code = url.searchParams.get('code');
-
+                        if ((error || code) && url.searchParams.get('state') !== this.state) {
+                            cleanup();
+                            reject(new Error('CHZZK OAuth state mismatch'));
+                            return;
+                        }
+                        if (error) {
+                            cleanup();
+                            reject(new Error(`CHZZK OAuth error: ${error}`));
+                            return;
+                        }
                         if (code) {
-                            isResolved = true;
                             cleanup();
                             if (this.authPopup && !this.authPopup.closed) {
                                 this.authPopup.close();
                             }
+                            this.authPopup = null;
                             resolve(code);
                         }
                     }
@@ -124,13 +127,8 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                 }
             }, 500);
             const timeout = setTimeout(() => {
-                if (!isResolved) {
-                    cleanup();
-                    if (this.authPopup && !this.authPopup.closed) {
-                        this.authPopup.close();
-                    }
-                    reject(new Error('OAuth 인증 시간이 초과되었습니다.'));
-                }
+                cleanup();
+                reject(new Error('OAuth 인증 시간이 초과되었습니다.'));
             }, 5 * 60 * 1000);
 
             const cleanup = () => {
@@ -140,25 +138,18 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
         });
     }
 
-    async authenticate(options: ChzzkAuthOptions): Promise<void> {
+    async authenticate(_options: ChzzkAuthOptions): Promise<void> {
         try {
-            chzzkAuthStore.getState().setAuthOptions({
-                clientId: options.clientId,
-                clientSecret: options.clientSecret,
-            });
-
-            const state = options.state || this.state;
-            if (!state) {
-                throw new Error('State is required for authentication');
+            if (!this.code || !this.state) {
+                throw new Error('A validated CHZZK OAuth callback is required');
             }
 
             const tokens = await chzzkAuthApi.getAccessToken({
-                grantType: 'authorization_code',
-                clientId: options.clientId,
-                clientSecret: options.clientSecret,
                 code: this.code,
-                state: state,
+                state: this.state,
             });
+            this.code = '';
+            this.state = '';
 
             chzzkAuthStore.getState().setTokens({
                 accessToken: tokens.content.accessToken,
@@ -219,11 +210,18 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
                         const connected = result as ConnectedMessageBody;
                         chzzkAuthStore.getState().setSessionKey(connected.data.sessionKey);
 
-                        await this.subscribeAll();
-
-                        this._isConnected = true;
-                        this.emit('connected');
-                        this.logger.debug('Connected and subscribed');
+                        try {
+                            await this.subscribeAll();
+                            this._isConnected = true;
+                            this.emit('connected');
+                            this.logger.debug('Connected and subscribed');
+                        } catch (error) {
+                            this._isConnected = false;
+                            socket.disconnect();
+                            this.emit('disconnected');
+                            this.logger.error('Event subscription failed:', error);
+                            this.emit('error', error);
+                        }
                         break;
                     }
                     case SYSTEM_MESSAGE_TYPE.SUBSCRIBED:
@@ -296,8 +294,18 @@ export class ChzzkAdapter extends EventEmitter implements IChatAdapter {
 
     private async subscribeAll(): Promise<void> {
         await this.subscribeToChat();
-        await this.subscribeToDonation();
-        await this.subscribeToSubscription();
+        // Extra event scopes are optional for a chat connection.
+        for (const { name, subscribe } of [
+            { name: '후원', subscribe: () => this.subscribeToDonation() },
+            { name: '구독', subscribe: () => this.subscribeToSubscription() },
+        ]) {
+            try {
+                await subscribe();
+            } catch (error: any) {
+                if (error?.response?.status !== 403) throw error;
+                this.logger.warn(`${name} 이벤트 구독이 거부되어 건너뜁니다. (HTTP 403)`);
+            }
+        }
     }
     private async subscribeToChat(): Promise<void> {
         const sessionKey = chzzkAuthStore.getState().sessionKey;

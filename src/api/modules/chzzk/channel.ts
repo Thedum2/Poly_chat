@@ -1,5 +1,4 @@
 ﻿import { httpClient } from "../../httpClient";
-import { API_ENDPOINTS } from "../../config";
 import {GetChannelInfoResponse, GetUserInfoResponse} from "../../model/chzzk/channel";
 import {chzzkAuthStore} from "../../../store/chzzkAuthStore";
 
@@ -12,7 +11,7 @@ export const chzzkChannelApi = {
     //======================
     getUserInfo: async (): Promise<GetUserInfoResponse> => {
         return httpClient.get(
-            `${getChzzkApiUrl()}/open/v1/users/me`,
+            `${getChzzkApiUrl()}/users/me`,
             (data) => data as any,
             {
                 headers: {
@@ -27,18 +26,12 @@ export const chzzkChannelApi = {
     // 6. 치지직 채널 정보 가져오기
     //======================
     getChannelInfo: async (channelIds: string): Promise<GetChannelInfoResponse> => {
-        const { clientId, clientSecret } = chzzkAuthStore.getState();
-        if (!clientId || !clientSecret) {
-            throw new Error('Client ID and Client Secret are not set.');
-        }
-
         return httpClient.get(
-            `${getChzzkApiUrl()}/open/v1/channels?channelIds=${channelIds}`,
+            `${getChzzkApiUrl()}/channels?channelIds=${encodeURIComponent(channelIds)}`,
             (data) => data as any,
             {
                 headers: {
-                    'Client-Id': clientId,
-                    'Client-Secret': clientSecret,
+                    'Authorization': `Bearer ${chzzkAuthStore.getState().accessToken}`,
                     'Accept': 'application/json'
                 }
             }

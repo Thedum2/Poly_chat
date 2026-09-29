@@ -1,5 +1,4 @@
 import { httpClient } from "../../httpClient";
-import { API_ENDPOINTS } from "../../config";
 import {
     AuthCodeRequest,
     TokenIssueRequest,
@@ -7,13 +6,15 @@ import {
     TokenRefreshRequest,
     TokenRefreshResponse,
     TokenRevokeRequest,
-    TokenRevokeResponse
+    TokenRevokeResponse, PublicConfigResponse
 } from "../../model/chzzk/auth";
 import { chzzkAuthStore } from "../../../store/chzzkAuthStore";
 
 const getChzzkApiUrl = () => chzzkAuthStore.getState().apiBaseUrl;
 
 export const chzzkAuthApi = {
+    getConfig: async (): Promise<PublicConfigResponse> => httpClient.get(
+        `${getChzzkApiUrl()}/config`, (data) => data as PublicConfigResponse),
 
     //======================
     // 1. 인증 코드 요청 및 발급
@@ -28,14 +29,10 @@ export const chzzkAuthApi = {
     //======================
     getAccessToken: async (data: TokenIssueRequest): Promise<TokenIssueResponse> => {
         return httpClient.post(
-            `${getChzzkApiUrl()}/auth/v1/token`,
+            `${getChzzkApiUrl()}/auth/token`,
             data,
             (data) => data as TokenIssueResponse,
-            {
-                headers: {
-
-                }
-            }
+            { headers: { 'Content-Type': 'application/json' } }
         );
     },
 
@@ -44,14 +41,10 @@ export const chzzkAuthApi = {
     //======================
     refreshAccessToken: async (data: TokenRefreshRequest): Promise<TokenRefreshResponse> => {
         return httpClient.post(
-            `${getChzzkApiUrl()}/auth/v1/token`,
+            `${getChzzkApiUrl()}/auth/refresh`,
             data,
             (data) => data as TokenRefreshResponse,
-            {
-                headers: {
-
-                }
-            }
+            { headers: { 'Content-Type': 'application/json' } }
         );
     },
 
@@ -60,14 +53,10 @@ export const chzzkAuthApi = {
     //======================
     revokeAccessToken: async (data: TokenRevokeRequest): Promise<TokenRevokeResponse> => {
         return httpClient.post(
-            `${getChzzkApiUrl()}/auth/v1/token/revoke`,
+            `${getChzzkApiUrl()}/auth/revoke`,
             data,
             (data) => data as TokenRevokeResponse,
-            {
-                headers: {
-
-                }
-            }
+            { headers: { 'Content-Type': 'application/json' } }
         );
     },
 };

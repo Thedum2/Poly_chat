@@ -1,37 +1,108 @@
-﻿name: poly-chat-bridge CI & CD
+name: PolyChat CI and npm release
 
 on:
+  pull_request:
+  push:
+    branches: [develop, main, master]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the checked package version to npm
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: polychat-${{ github.event_name == 'workflow_dispatch' && inputs.publish && 'npm-release' || github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build-publish:
-    name: Build & Publish (Node 22)
+  validate:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 20
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch }}
+          persist-credentials: false
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          registry-url: 'https://registry.npmjs.org'
-          cache: 'npm'
+          node-version: 24
+          cache: npm
 
-      - name: Install
-        run: npm ci
+      - name: Check release prerequisites before building
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NPM_TOKEN" || { echo '::error::NPM_TOKEN is required for npm publishing.'; exit 1; }
+          node scripts/check-release.mjs
 
-      - name: Build (ensure dist)
-        run: npm run build
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck:server
+      - run: npm run build
+      - run: npm run test:package
 
-      - name: Publish to npm
+      - name: Build development demo
+        run: npm run build:dev --workspace=polychat-example-react
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polychat-demo-dev
+          path: apps/example-react/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Build production demo
+        run: npm run build:prod --workspace=polychat-example-react
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polychat-demo-prod
+          path: apps/example-react/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain the tested npm tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: polychat-package
+          path: .artifacts/*.tgz
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          name: polychat-package
+          path: .artifacts
+      - name: Publish the tested tarball
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/check-release.mjs
+          packages=(.artifacts/*.tgz)
+          test "${#packages[@]}" -eq 1
+          npm publish "${packages[0]}" --access public --provenance

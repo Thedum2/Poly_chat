@@ -188,7 +188,7 @@ export class SoopAdapter extends EventEmitter implements IChatAdapter {
                 if (stationInfo.result === 1 && stationInfo.data) {
                     this._isAuthenticated = true;
                     this.emit('auth', {
-                        nickname: stationInfo.data.station_name,
+                        nickname: stationInfo.data.user_nick,
                         profileImageUrl: stationInfo.data.profile_image
                     });
                     this.logger.info('Authenticated successfully with broadcaster info');

@@ -4,7 +4,7 @@ import {YouTubeAuthOptions, YouTubeInitOptions} from '../../models/Auth';
 import {youtubeAuthStore} from '../../store/youtubeAuthStore';
 import {youtubeAuthApi} from '../../api/modules/youtube/auth';
 import {youtubeLiveBroadcastApi} from '../../api/modules/youtube/liveBroadcast';
-import {youtubeLiveChatApi} from '../../api/modules/youtube/liveChat';
+import {youtubeLiveChatStream, YouTubeStreamError} from '../../api/modules/youtube/liveChatStream';
 import {ChatMessage} from '../../models/ChatMessage';
 import {PLATFORM_NAME} from '../../api/config';
 import {v4 as uuidv4} from 'uuid';
@@ -19,10 +19,8 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
     private redirectUri: string = '';
     private authPopup: Window | null = null;
     private state: string = '';
-    private liveChatId: string | null = null;
-    private pollingInterval: NodeJS.Timeout | null = null;
-    private nextPageToken: string | null = null;
-    private pollingIntervalMs: number = 5000;
+    private streamUrl = '/api/youtube/chat/stream';
+    private streamController: AbortController | null = null;
     private logger = createLogger('[YouTube]');
 
     get isAuthenticated(): boolean {
@@ -38,20 +36,19 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
             throw new Error('YouTube adapter requires browser environment');
         }
 
+        this.stopStreaming();
         this._isAuthenticated = false;
         this._isConnected = false;
 
         this.clientId = options.clientId;
         this.redirectUri = options.redirectUri;
 
-        if (options.pollingIntervalSeconds !== undefined) {
-            if (options.pollingIntervalSeconds < 1 || options.pollingIntervalSeconds > 10) {
-                throw new Error('pollingIntervalSeconds must be between 1 and 10 seconds');
-            }
-            this.pollingIntervalMs = options.pollingIntervalSeconds * 1000;
-        }
+        this.streamUrl = options.streamUrl?.trim() || '/api/youtube/chat/stream';
 
         try {
+            if (new URL(this.redirectUri).origin !== window.location.origin) {
+                throw new Error(`콜백 주소는 현재 페이지와 같은 출처여야 합니다. ${window.location.origin}/callback 을 사용해주세요.`);
+            }
             await this.openAuthPopup();
             this.logger.info('OAuth popup completed');
             this.emit('initialized');
@@ -98,31 +95,38 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
                     const popupUrl = this.authPopup?.location.href;
                     if (popupUrl) {
                         const url = new URL(popupUrl);
+                        const callbackUrl = new URL(this.redirectUri);
+                        if (url.origin !== callbackUrl.origin || url.pathname !== callbackUrl.pathname) {
+                            return;
+                        }
 
                         const hash = url.hash.substring(1);
                         const params = new URLSearchParams(hash);
                         const accessToken = params.get('access_token');
-                        const state = params.get('state');
+                        const oauthError = params.get('error') || url.searchParams.get('error');
+                        const state = params.get('state') || url.searchParams.get('state');
 
-                        if (accessToken && state) {
-
-                            if (state !== this.state) {
-                                cleanup();
-                                if (this.authPopup && !this.authPopup.closed) {
-                                    this.authPopup.close();
-                                }
-                                reject(new Error('Invalid state - possible CSRF attack'));
-                                return;
-                            }
-
+                        if (accessToken || oauthError) {
                             isResolved = true;
                             cleanup();
                             if (this.authPopup && !this.authPopup.closed) {
                                 this.authPopup.close();
                             }
 
+                            if (!state || state !== this.state) {
+                                reject(new Error('Invalid state - possible CSRF attack'));
+                                return;
+                            }
+
+                            if (oauthError) {
+                                reject(new Error(oauthError === 'access_denied'
+                                    ? 'YouTube 로그인이 취소되었거나 권한이 거부되었습니다. (access_denied) 다시 초기화해주세요.'
+                                    : `YouTube OAuth 인증에 실패했습니다. (${oauthError})`));
+                                return;
+                            }
+
                             youtubeAuthStore.getState().setTokens({
-                                accessToken: accessToken,
+                                accessToken: accessToken!,
                                 refreshToken: '',
                             });
 
@@ -193,100 +197,131 @@ export class YouTubeAdapter extends EventEmitter implements IChatAdapter {
         if (!this._isAuthenticated) {
             throw new Error('Authentication is required before connecting.');
         }
-
+        this.stopStreaming();
+        this._isConnected = false;
+        const controller = new AbortController();
+        this.streamController = controller;
+        const {signal} = controller;
+        const connectedAt = Date.now();
         try {
             const accessToken = youtubeAuthStore.getState().accessToken;
-            if (!accessToken) {
-                throw new Error('No access token available');
-            }
-
-            const broadcastsResponse = await youtubeLiveBroadcastApi.listLiveBroadcasts(accessToken, {mine: true});
-
-            if (broadcastsResponse.items.length === 0) {
-                throw new Error('활성 방송을 찾을 수 없습니다. 라이브 스트리밍을 시작한 후 다시 시도해주세요.');
-            }
-
-            this.liveChatId = broadcastsResponse.items[0].snippet.liveChatId || null;
-
-            if (!this.liveChatId) {
-                throw new Error('라이브 채팅이 활성화되지 않았습니다.');
-            }
-
-            this.logger.debug('Live chat ID found');
-
-            this._isConnected = true;
-            this.emit('connected');
-            await this.startPolling();
-
-            this.logger.info('Connected and polling started');
-        } catch (error: any) {
-            this.logger.error('Connection failed:', error);
+            if (!accessToken) throw new Error('No access token available');
+            const broadcasts = await youtubeLiveBroadcastApi.listLiveBroadcasts(accessToken, {mine: true}, signal);
+            if (signal.aborted) return;
+            const liveChatId = broadcasts.items.find(item => item.snippet.liveChatId)?.snippet.liveChatId;
+            if (!liveChatId) throw new Error('라이브 채팅을 찾을 수 없습니다. 라이브 스트리밍을 시작한 후 다시 시도해주세요.');
+            await this.startStreaming(liveChatId, connectedAt, controller);
+        } catch (error) {
+            if (signal.aborted) return;
+            this.stopStreaming();
             this._isConnected = false;
+            this.logger.error('Connection failed:', error);
             this.emit('error', error);
             throw error;
         }
     }
 
-    private async startPolling(): Promise<void> {
-        if (!this.liveChatId) return;
+    private startStreaming(liveChatId: string, connectedAt: number, controller: AbortController): Promise<void> {
+        const {signal} = controller;
+        let nextPageToken: string | undefined;
+        const seen = new Set<string>();
+        let ready = false;
+        let resolveReady!: () => void;
+        let rejectReady!: (error: unknown) => void;
+        const pending = new Promise<void>((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
+        const cancelled = () => resolveReady();
+        signal.addEventListener('abort', cancelled, {once: true});
 
-        const poll = async () => {
-            try {
-                const accessToken = youtubeAuthStore.getState().accessToken;
-                if (!accessToken || !this.liveChatId) {
-                    this.stopPolling();
-                    return;
+        const receive = async () => {
+            let retryDelay = 1000;
+            while (!signal.aborted) {
+                const startedAt = Date.now();
+                try {
+                    const accessToken = youtubeAuthStore.getState().accessToken;
+                    if (!accessToken) throw new YouTubeStreamError('YouTube에 다시 로그인해주세요.', 401, false);
+                    await youtubeLiveChatStream.receive({
+                        url: this.streamUrl, accessToken, liveChatId, pageToken: nextPageToken, signal,
+                        onReady: () => {
+                            if (signal.aborted || ready) return;
+                            ready = true;
+                            this._isConnected = true;
+                            resolveReady();
+                            this.emit('connected');
+                            this.logger.info('Realtime stream connected');
+                        },
+                        onBatch: (batch) => {
+                            if (signal.aborted) return;
+                            for (const item of batch.items) {
+                                if (signal.aborted) return;
+                                const publishedAt = Date.parse(item.snippet?.publishedAt);
+                                if (!Number.isFinite(publishedAt) || publishedAt < connectedAt) continue;
+                                if (item.snippet.type !== 'textMessageEvent' || !item.snippet.textMessageDetails || !item.id || seen.has(item.id)) continue;
+                                seen.add(item.id);
+                                if (seen.size > 5000) seen.delete(seen.values().next().value!);
+                                const msg: ChatMessage = {
+                                    platform: PLATFORM_NAME.YOUTUBE,
+                                    chat_id: item.id,
+                                    nickname: item.authorDetails?.displayName || 'Unknown',
+                                    content: item.snippet.textMessageDetails.messageText,
+                                    timestamp: new Date(publishedAt),
+                                };
+                                this.emit('message', msg);
+                            }
+                            if (signal.aborted) return;
+                            if (batch.nextPageToken) nextPageToken = batch.nextPageToken;
+                            if (batch.offlineAt) void this.disconnect();
+                        },
+                    });
+                } catch (error) {
+                    if (signal.aborted) return;
+                    const retryable = error instanceof YouTubeStreamError ? error.retryable : error instanceof TypeError;
+                    if (!retryable) throw error;
+                    this.logger.warn('Realtime stream interrupted; reconnecting');
                 }
-
-                const response = await youtubeLiveChatApi.listLiveChatMessages(accessToken, {
-                    liveChatId: this.liveChatId,
-                    part: 'id,snippet,authorDetails',
-                    pageToken: this.nextPageToken || undefined,
-                });
-
-                for (const item of response.items) {
-                    if (item.snippet.type === 'textMessageEvent' && item.snippet.textMessageDetails) {
-                        const msg: ChatMessage = {
-                            platform: PLATFORM_NAME.YOUTUBE,
-                            chat_id: 'unknown', // TODO 1.1.0: Implement unique chat message ID tracking
-                            nickname: item.authorDetails?.displayName || 'Unknown',
-                            content: item.snippet.textMessageDetails.messageText,
-                            timestamp: new Date(item.snippet.publishedAt),
-                        };
-                        this.emit('message', msg);
-                    }
-                }
-
-                this.nextPageToken = response.nextPageToken || null;
-
-                const pollingInterval = this.pollingIntervalMs;
-                this.pollingInterval = setTimeout(poll, pollingInterval);
-            } catch (error) {
-                this.logger.error('Polling error:', error);
-                this.emit('error', error);
-                this.pollingInterval = setTimeout(poll, this.pollingIntervalMs);
+                if (signal.aborted) return;
+                if (Date.now() - startedAt >= 30000) retryDelay = 1000;
+                await this.waitForRetry(retryDelay, signal);
+                retryDelay = Math.min(retryDelay * 2, 30000);
             }
         };
-
-        await poll();
+        void receive().catch(error => {
+            if (signal.aborted) return;
+            if (!ready) {
+                rejectReady(error);
+            } else {
+                this.stopStreaming();
+                this._isConnected = false;
+                this.emit('disconnected');
+                this.logger.error('Realtime stream failed:', error);
+                this.emit('error', error);
+            }
+        }).finally(() => signal.removeEventListener('abort', cancelled));
+        return pending;
     }
 
-    private stopPolling(): void {
-        if (this.pollingInterval) {
-            clearTimeout(this.pollingInterval);
-            this.pollingInterval = null;
-        }
-        this.nextPageToken = null;
+    private waitForRetry(delay: number, signal: AbortSignal): Promise<void> {
+        return new Promise(resolve => {
+            const finish = () => {
+                clearTimeout(timer);
+                signal.removeEventListener('abort', finish);
+                resolve();
+            };
+            const timer = setTimeout(finish, delay);
+            signal.addEventListener('abort', finish, {once: true});
+            if (signal.aborted) finish();
+        });
+    }
+
+    private stopStreaming(): void {
+        this.streamController?.abort();
+        this.streamController = null;
     }
 
     async disconnect(): Promise<void> {
-        try {
-            this.stopPolling();
-        } finally {
-            this._isConnected = false;
-            this.emit('disconnected');
-            this.logger.info('Disconnected');
-        }
+        this.stopStreaming();
+        this._isConnected = false;
+        this.emit('disconnected');
+        this.logger.info('Disconnected');
     }
 
     async logout(): Promise<void> {

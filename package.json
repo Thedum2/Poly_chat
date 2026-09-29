@@ -1,11 +1,11 @@
 {
   "name": "polychat-bridge",
   "version": "1.0.2",
-  "description": "YouTube, Chzzk, SOOP 등 서로 다른 인터넷 방송 플랫폼의 채팅 스트림을 하나의 공통 인터페이스로 다루는 TypeScript 라이브러리입니다.\r 플랫폼별 인증·전송 방식(REST 폴링, WebSocket, SDK 콜백)을 어댑터 패턴으로 캡슐화하여, 앱에서는 동일한 타입과 이벤트로 메시지를 처리합니다.",
+  "description": "YouTube, Chzzk, SOOP 등 서로 다른 인터넷 방송 플랫폼의 채팅 스트림을 하나의 공통 인터페이스로 다루는 TypeScript 라이브러리입니다.\r 플랫폼별 인증·전송 방식(gRPC/SSE 스트리밍, WebSocket, SDK 콜백)을 어댑터 패턴으로 캡슐화하여, 앱에서는 동일한 타입과 이벤트로 메시지를 처리합니다.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -19,14 +19,20 @@
   ],
   "sideEffects": false,
   "scripts": {
+    "test": "npm run test:library && npm run test --workspace=polychat-example-react",
+    "test:library": "tsx --test test/*.test.ts",
+    "test:package": "node scripts/check-package.mjs",
     "build": "tsup --config tsup.config.ts",
     "dev": "tsup --watch --config tsup.config.ts",
     "clean": "rimraf dist",
-    "demo": "npm run build && npm run dev --workspace=polychat-example-react"
+    "demo": "npm run build && npm run dev --workspace=polychat-example-react",
+    "youtube:server": "tsx server/youtube-server.ts",
+    "typecheck:server": "tsc --noEmit -p server/tsconfig.json"
   },
   "devDependencies": {
     "@swc/core": "^1.6.13",
     "@types/socket.io-client": "^1.4.36",
+    "esbuild": "^0.25.10",
     "rimraf": "^6.0.0",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
@@ -50,7 +56,10 @@
     "apps/*"
   ],
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.5",
+    "@grpc/proto-loader": "^0.8.1",
     "axios": "^1.12.2",
+    "events": "^3.3.0",
     "socket.io-client": "^2.0.3",
     "uuid": "^13.0.0",
     "zustand": "^5.0.8"

@@ -13,7 +13,15 @@ export function installLoggingInterceptor(instance: AxiosInstance) {
         return r;
     }, (err) => {
         const {config, response} = err || {};
-        logger.error(`⨯ ${response?.status ?? "ERR"} ${config?.method?.toUpperCase()} ${config?.url}`, response?.data ?? err?.message);
+        const detail = response?.data?.error ?? response?.data;
+        const reasons = Array.isArray(detail?.errors)
+            ? detail.errors.map((entry: any) => entry?.reason).filter((reason: unknown) => typeof reason === 'string')
+            : [];
+        const message = typeof detail?.message === 'string' ? detail.message : err?.message;
+        logger.error(
+            `⨯ ${response?.status ?? "ERR"} ${config?.method?.toUpperCase()} ${config?.url}`,
+            [message, ...reasons].filter(Boolean).join(' | ')
+        );
         return Promise.reject(err);
     });
 }

@@ -1,34 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
+import { CHZZK_API_BASE_URL, YOUTUBE_STREAM_URL } from './config';
 import { ChzzkAdapter, SoopAdapter, YouTubeAdapter, ChatMessage, PolyChat, BroadcasterInfo } from 'polychat-bridge';
 
-type Platform = 'chzzk' | 'soop' | 'youtube';
-
-interface PlatformConfig {
-  clientId: string;
-  clientSecret?: string;
-  redirectUri?: string;
-  pollingIntervalSeconds?: number;
-}
-
-interface AdapterState {
-  adapter: ChzzkAdapter | SoopAdapter | YouTubeAdapter;
-  status: 'disconnected' | 'initialized' | 'authenticated' | 'connected';
-  error: string;
-  config: PlatformConfig;
-  broadcasterInfo?: BroadcasterInfo | null;
-}
-
-type MessageType = 'chat' | 'system';
-
-interface DisplayMessage {
-  platform: Platform;
-  type: MessageType;
-  nickname: string;
-  content: string;
-  timestamp: Date;
-  chat_id?: string;
-}
+import type { AdapterState, DisplayMessage, Platform, PlatformConfig } from './types';
+import DashboardShell from './components/DashboardShell';
+import SetupView from './components/SetupView';
+import ChatView from './components/ChatView';
 
 function App() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<Set<Platform>>(new Set());
@@ -36,21 +14,17 @@ function App() {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [isConfigured, setIsConfigured] = useState(false);
   const [polyChat] = useState<PolyChat>(() => new PolyChat());
-  const chatMessagesRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isTestMode, setIsTestMode] = useState(false);
   const testModeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    // Use scrollIntoView for more reliable scrolling
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    window.scrollTo(0, 0);
+  }, [isConfigured]);
 
   // Test mode: Simulate incoming messages
   useEffect(() => {
-    if (isTestMode) {
-      const platforms: Platform[] = ['chzzk', 'soop', 'youtube'];
+    if (isTestMode && isConfigured) {
+      const platforms = Array.from(selectedPlatforms);
       const usernames = ['테스트유저1', '테스트유저2', '테스트유저3', '뷰어123', '시청자A', '팬B'];
       const messageContents = [
         '안녕하세요!',
@@ -80,9 +54,9 @@ function App() {
         }]);
       };
 
-      // Generate messages at random intervals (500ms ~ 2000ms)
+      // Keep sample conversations readable at a natural pace.
       const scheduleNextMessage = () => {
-        const delay = Math.random() * 500
+        const delay = 900 + Math.random() * 900;
         testModeIntervalRef.current = setTimeout(() => {
           generateRandomMessage();
           scheduleNextMessage();
@@ -98,7 +72,7 @@ function App() {
         }
       };
     }
-  }, [isTestMode]);
+  }, [isTestMode, isConfigured, selectedPlatforms]);
 
   // Set up PolyChat event listeners
   useEffect(() => {
@@ -135,12 +109,15 @@ function App() {
 
     const handleAuth = ({ platform, broadcasterInfo }: { platform: string; broadcasterInfo: BroadcasterInfo | null }) => {
       console.log(`[${platform.toUpperCase()}] Auth:`, broadcasterInfo);
-      if (broadcasterInfo) {
+      if (polyChat.getAdapter(platform)?.isAuthenticated) {
         updateAdapterState(platform as Platform, {
           status: 'authenticated',
-          broadcasterInfo: broadcasterInfo
+          broadcasterInfo,
+          error: '',
         });
-        addSystemMessage(platform as Platform, `🔑 인증 성공: ${broadcasterInfo.nickname}`);
+        addSystemMessage(platform as Platform, broadcasterInfo
+          ? `🔑 인증 성공: ${broadcasterInfo.nickname}`
+          : '🔑 인증 성공 (채널 정보를 가져오지 못했습니다)');
       } else {
         updateAdapterState(platform as Platform, {
           status: 'disconnected',
@@ -185,9 +162,8 @@ function App() {
   // Platform configurations
   const [configs, setConfigs] = useState<Record<Platform, PlatformConfig>>({
     chzzk: {
-      clientId: import.meta.env.VITE_CHZZK_CLIENT_ID || '',
-      clientSecret: import.meta.env.VITE_CHZZK_CLIENT_SECRET || '',
-      redirectUri: 'http://localhost:3000/callback',
+      clientId: '',
+      redirectUri: `${window.location.origin}/callback`,
     },
     soop: {
       clientId: import.meta.env.VITE_SOOP_CLIENT_ID || '',
@@ -195,8 +171,7 @@ function App() {
     },
     youtube: {
       clientId: import.meta.env.VITE_YOUTUBE_CLIENT_ID || '',
-      redirectUri: 'http://localhost:3000/callback',
-      pollingIntervalSeconds: 5, // 기본값 5초
+      redirectUri: `${window.location.origin}/callback`,
     },
   });
 
@@ -217,7 +192,7 @@ function App() {
       ...prev,
       [platform]: {
         ...prev[platform],
-        [key]: key === 'pollingIntervalSeconds' ? Number(value) : value,
+        [key]: value,
       },
     }));
   };
@@ -234,18 +209,21 @@ function App() {
     const config = configs[platform];
 
     try {
-      let adapter: ChzzkAdapter | SoopAdapter | YouTubeAdapter;
-
-      if (platform === 'chzzk') {
-        adapter = new ChzzkAdapter();
-      } else if (platform === 'soop') {
-        adapter = new SoopAdapter();
-      } else {
-        adapter = new YouTubeAdapter();
+      let adapter = polyChat.getAdapter(platform) as ChzzkAdapter | SoopAdapter | YouTubeAdapter | undefined;
+      if (!adapter) {
+        adapter = platform === 'chzzk' ? new ChzzkAdapter()
+          : platform === 'soop' ? new SoopAdapter() : new YouTubeAdapter();
+        polyChat.registerAdapter(adapter);
       }
 
-      // Register adapter with PolyChat
-      polyChat.registerAdapter(adapter);
+      const initializingAdapter = adapter;
+      setAdapters((prev) => new Map(prev).set(platform, {
+        adapter: initializingAdapter,
+        status: 'disconnected',
+        error: '',
+        isInitializing: true,
+        config: { ...config },
+      }));
 
       // Initialize - init now handles code internally
       if (platform === 'chzzk') {
@@ -254,10 +232,8 @@ function App() {
           throw new Error('redirectUri is required for CHZZK');
         }
         await (adapter as ChzzkAdapter).init({
-          clientId: config.clientId,
-          clientSecret: config.clientSecret || '',
           redirectUri: config.redirectUri,
-          apiBaseUrl: '/api/chzzk',
+          apiBaseUrl: CHZZK_API_BASE_URL,
         });
       } else if (platform === 'youtube') {
         // YouTube requires redirectUri
@@ -267,7 +243,7 @@ function App() {
         await (adapter as YouTubeAdapter).init({
           clientId: config.clientId,
           redirectUri: config.redirectUri,
-          pollingIntervalSeconds: config.pollingIntervalSeconds,
+          streamUrl: YOUTUBE_STREAM_URL,
         });
       } else {
         // SOOP doesn't require redirectUri
@@ -277,18 +253,11 @@ function App() {
         });
       }
 
-      setAdapters((prev) => {
-        const next = new Map(prev);
-        next.set(platform, {
-          adapter,
-          status: 'initialized',
-          error: '',
-          config: { ...config },
-        });
-        return next;
-      });
+      updateAdapterState(platform, { status: 'initialized', error: '' });
     } catch (err: any) {
       updateAdapterState(platform, { error: err.message });
+    } finally {
+      updateAdapterState(platform, { isInitializing: false });
     }
   };
 
@@ -300,12 +269,7 @@ function App() {
       const config = configs[platform];
 
       if (platform === 'chzzk') {
-        await (adapterState.adapter as ChzzkAdapter).authenticate({
-          clientId: config.clientId,
-          clientSecret: config.clientSecret || '',
-          redirectUri: config.redirectUri || '',
-          state: '', // adapter internal state will be used
-        });
+        await (adapterState.adapter as ChzzkAdapter).authenticate({});
       } else if (platform === 'soop') {
         await (adapterState.adapter as SoopAdapter).authenticate({
           clientId: config.clientId,
@@ -357,6 +321,7 @@ function App() {
   };
 
   const handleReset = () => {
+    setIsTestMode(false);
     adapters.forEach((state) => {
       state.adapter.disconnect().catch(() => {});
     });
@@ -365,294 +330,42 @@ function App() {
     setIsConfigured(false);
   };
 
-  const getPlatformName = (platform: Platform) => {
-    switch (platform) {
-      case 'chzzk': return 'CHZZK';
-      case 'soop': return 'SOOP';
-      case 'youtube': return 'YouTube';
-    }
-  };
-
-  const getPlatformColor = (platform: Platform) => {
-    switch (platform) {
-      case 'chzzk': return '#00e7a0';
-      case 'soop': return '#ff6b00';
-      case 'youtube': return '#ff0000';
-    }
-  };
-
-  if (!isConfigured) {
-    return (
-      <div className="app">
-        <header className="app-header">
-          <h1>PolyChat</h1>
-          <p>Multi-Platform Chat Bridge</p>
-        </header>
-
-        <div className="configuration-container">
-          <div className="config-section">
-            <h2>플랫폼 선택</h2>
-            <div className="platform-checkboxes">
-              {(['chzzk', 'soop', 'youtube'] as Platform[]).map((platform) => (
-                <label key={platform} className={`platform-checkbox ${selectedPlatforms.has(platform) ? 'selected' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={selectedPlatforms.has(platform)}
-                    onChange={() => togglePlatform(platform)}
-                  />
-                  <span className="checkbox-label">{getPlatformName(platform)}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {selectedPlatforms.size > 0 && (
-            <>
-              {Array.from(selectedPlatforms).map((platform) => (
-                <div key={platform} className="config-section">
-                  <h3>{getPlatformName(platform)} 설정</h3>
-                  <div className="config-form">
-                    <div className="form-field">
-                      <label>Client ID</label>
-                      <input
-                        type="text"
-                        value={configs[platform].clientId}
-                        onChange={(e) => updateConfig(platform, 'clientId', e.target.value)}
-                        placeholder="Client ID 입력"
-                      />
-                    </div>
-                    {(platform === 'chzzk' || platform === 'soop') && (
-                      <div className="form-field">
-                        <label>Client Secret</label>
-                        <input
-                          type="password"
-                          value={configs[platform].clientSecret}
-                          onChange={(e) => updateConfig(platform, 'clientSecret', e.target.value)}
-                          placeholder="Client Secret 입력"
-                        />
-                      </div>
-                    )}
-                    {(platform === 'chzzk' || platform === 'youtube') && (
-                      <div className="form-field">
-                        <label>Redirect URI</label>
-                        <input
-                          type="text"
-                          value={configs[platform].redirectUri || ''}
-                          onChange={(e) => updateConfig(platform, 'redirectUri', e.target.value)}
-                          placeholder="Redirect URI 입력"
-                        />
-                      </div>
-                    )}
-                    {platform === 'youtube' && (
-                      <div className="form-field">
-                        <label>Polling 간격 (초)</label>
-                        <select
-                          value={configs[platform].pollingIntervalSeconds || 5}
-                          onChange={(e) => updateConfig(platform, 'pollingIntervalSeconds', e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '0.75rem 1rem',
-                            background: '#0f0f0f',
-                            border: '1px solid #1a1a1a',
-                            color: '#ffffff',
-                            fontSize: '0.9375rem',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((seconds) => (
-                            <option key={seconds} value={seconds}>
-                              {seconds}초
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              <button className="btn-primary" onClick={handleConfigure}>
-                다음
-              </button>
-            </>
-          )}
-        </div>
-
-        <footer className="app-footer">
-          <p>Powered by <strong>PolyChat</strong></p>
-        </footer>
-      </div>
-    );
-  }
+  const connectedCount = Array.from(adapters.values()).filter((state) => state.status === 'connected').length;
+  const toggleTestMode = () => setIsTestMode((current) => !current);
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>PolyChat</h1>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            className={`btn-reset ${isTestMode ? 'btn-disconnect' : ''}`}
-            onClick={() => setIsTestMode(!isTestMode)}
-          >
-            {isTestMode ? '테스트 중지' : '테스트 모드'}
-          </button>
-          <button className="btn-reset" onClick={handleReset}>
-            재설정
-          </button>
-        </div>
-      </header>
-
-      <div className="main-container">
-        {/* Control Panel */}
-        <div className="control-panel">
-          {Array.from(selectedPlatforms).map((platform) => {
-            const state = adapters.get(platform);
-            const status = state?.status || 'disconnected';
-            const error = state?.error || '';
-
-            return (
-              <div key={platform} className="platform-control">
-                <div className="platform-control-header">
-                  <h3 style={{ color: getPlatformColor(platform) }}>{getPlatformName(platform)}</h3>
-                  <span className={`status-indicator status-${status}`}>
-                    {status === 'connected' && '● 연결됨'}
-                    {status === 'authenticated' && '● 인증됨'}
-                    {status === 'initialized' && '● 초기화됨'}
-                    {status === 'disconnected' && '○ 연결 안됨'}
-                  </span>
-                </div>
-
-                {state?.broadcasterInfo && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '0.75rem',
-                    background: '#1a1a1a',
-                    borderRadius: '0.5rem',
-                    marginBottom: '0.75rem',
-                  }}>
-                    <img
-                      src={state.broadcasterInfo.profileImageUrl}
-                      alt={state.broadcasterInfo.nickname}
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{
-                        color: '#ffffff',
-                        fontSize: '0.875rem',
-                        fontWeight: '500',
-                        marginBottom: '0.125rem',
-                      }}>
-                        {state.broadcasterInfo.nickname}
-                      </div>
-                      <div style={{
-                        color: '#888888',
-                        fontSize: '0.75rem',
-                      }}>
-                        방송인
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {error && (
-                  <div className="error-message">⚠ {error}</div>
-                )}
-
-                <div className="platform-controls">
-                  {status === 'disconnected' && (
-                    <button
-                      className="btn-control"
-                      onClick={() => handleInit(platform)}
-                    >
-                      초기화
-                    </button>
-                  )}
-
-                  {status === 'initialized' && (
-                    <button
-                      className="btn-control"
-                      onClick={() => handleAuthenticate(platform)}
-                    >
-                      인증
-                    </button>
-                  )}
-
-                  {status === 'authenticated' && (
-                    <button
-                      className="btn-control btn-connect"
-                      onClick={() => handleConnect(platform)}
-                    >
-                      연결
-                    </button>
-                  )}
-
-                  {status === 'connected' && (
-                    <button
-                      className="btn-control btn-disconnect"
-                      onClick={() => handleDisconnect(platform)}
-                    >
-                      연결 해제
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Chat Display */}
-        <div className="chat-panel">
-          <div className="chat-header">
-            <h2>통합 채팅</h2>
-            <span className="message-count">{messages.length} 메시지</span>
-          </div>
-
-          <div className="chat-messages" ref={chatMessagesRef}>
-            {messages.length === 0 ? (
-              <div className="empty-state">
-                채팅 메시지가 없습니다
-              </div>
-            ) : (
-              <>
-                {messages.map((msg, idx) => (
-                  <div key={idx} className={`chat-message ${msg.type === 'system' ? 'system-message' : ''}`}>
-                    <span
-                      className="platform-badge"
-                      style={{ backgroundColor: getPlatformColor(msg.platform) }}
-                    >
-                      {getPlatformName(msg.platform)}
-                    </span>
-                    <div className="message-body">
-                      <div className="message-meta">
-                        <span className={`message-author ${msg.type === 'system' ? 'system-author' : ''}`}>
-                          {msg.nickname}
-                        </span>
-                        <span className="message-time">{msg.timestamp.toLocaleTimeString()}</span>
-                      </div>
-                      <div className={`message-text ${msg.type === 'system' ? 'system-text' : ''}`}>
-                        {msg.content}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <footer className="app-footer">
-        <p>Powered by <strong>PolyChat</strong></p>
-      </footer>
-    </div>
+    <DashboardShell
+      configured={isConfigured}
+      testMode={isTestMode}
+      selectedCount={selectedPlatforms.size}
+      connectedCount={connectedCount}
+      messageCount={messages.length}
+      isInitializing={Array.from(adapters.values()).some((state) => state.isInitializing)}
+      onReset={handleReset}
+      onToggleTest={toggleTestMode}
+    >
+      {isConfigured ? (
+        <ChatView
+          selectedPlatforms={selectedPlatforms}
+          adapters={adapters}
+          messages={messages}
+          testMode={isTestMode}
+          onInit={handleInit}
+          onAuthenticate={handleAuthenticate}
+          onConnect={handleConnect}
+          onDisconnect={handleDisconnect}
+          onToggleTest={toggleTestMode}
+        />
+      ) : (
+        <SetupView
+          selectedPlatforms={selectedPlatforms}
+          configs={configs}
+          onToggle={togglePlatform}
+          onUpdateConfig={updateConfig}
+          onConfigure={handleConfigure}
+        />
+      )}
+    </DashboardShell>
   );
 }
 

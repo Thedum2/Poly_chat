@@ -13,13 +13,15 @@ export const youtubeLiveBroadcastApi = {
     //======================
     listLiveBroadcasts: async (
         accessToken: string,
-        data: LiveBroadcastsListRequest
+        data: LiveBroadcastsListRequest,
+        signal?: AbortSignal,
     ): Promise<LiveBroadcastsListResponse> => {
-        const params = new URLSearchParams(data as any).toString();
+        const params = new URLSearchParams({ part: 'snippet', mine: String(data.mine) });
         return httpClient.get(
             `${YOUTUBE_API_BASE_URL}/liveBroadcasts?${params.toString()}`,
             (data) => data as LiveBroadcastsListResponse,
             {
+                signal,
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                     'Accept': 'application/json'
