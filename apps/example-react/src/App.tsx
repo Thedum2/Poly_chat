@@ -302,7 +302,6 @@ function App() {
       } else if (platform === 'soop') {
         await (adapterState.adapter as SoopAdapter).authenticate({
           clientId: config.clientId,
-          apiBaseUrl: CHZZK_API_BASE_URL,
         });
       } else if (platform === 'youtube') {
         await (adapterState.adapter as YouTubeAdapter).authenticate({});
