@@ -11,6 +11,11 @@ on:
         required: true
         type: boolean
         default: false
+      verify_access:
+        description: Verify npm trusted publishing without publishing
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,16 +40,11 @@ jobs:
 
       - name: Check release prerequisites before building
         if: github.event_name == 'workflow_dispatch' && inputs.publish
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "$NPM_TOKEN" || { echo '::error::NPM_TOKEN is required for npm publishing.'; exit 1; }
-          node scripts/check-release.mjs
+        run: node scripts/check-release.mjs
 
       - run: npm ci
       - run: npm test
+      - run: node --test test/verify-npm-oidc.test.mjs
       - run: npm run typecheck:server
       - run: npm run build
       - run: npm run test:package
@@ -76,9 +76,26 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  verify_access:
+    if: github.event_name == 'workflow_dispatch' && (inputs.publish || inputs.verify_access)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Exchange GitHub OIDC identity with npm without publishing
+        run: node scripts/verify-npm-oidc.mjs
+
   publish:
     if: github.event_name == 'workflow_dispatch' && inputs.publish
-    needs: validate
+    needs: [validate, verify_access]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -97,8 +114,6 @@ jobs:
           name: polychat-package
           path: .artifacts
       - name: Publish the tested tarball
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
